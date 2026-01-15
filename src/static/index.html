@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cocoon Breaker - AI日报生成</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/logo.svg">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <!-- html2canvas for PNG export with multiple CDN fallbacks -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" 
+            integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==" 
+            crossorigin="anonymous" 
+            referrerpolicy="no-referrer"
+            onerror="this.onerror=null; this.src='https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h1 class="logo">
+                            <img src="/static/images/logo.svg" alt="Cocoon Breaker" class="logo-icon">
+                            Cocoon Breaker
+                        </h1>
+                        <p class="tagline">打破信息茧房，AI驱动的个性化日报</p>
+                    </div>
+                    <a href="/static/articles.html" style="color: white; text-decoration: none; font-size: 16px; padding: 10px 20px; background: rgba(255,255,255,0.2); border-radius: 4px; transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                        📚 浏览文章
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="container">
+            <!-- Subscriptions Section -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>📚 订阅管理</h2>
+                    <button @click="showAddDialog = true" class="btn btn-primary">
+                        ➕ 添加订阅
+                    </button>
+                </div>
+                
+                <div v-if="subscriptions.length === 0" class="empty-state">
+                    <p>还没有订阅任何主题，添加一个开始吧！</p>
+                </div>
+                
+                <div v-else class="subscriptions-grid">
+                    <div v-for="sub in subscriptions" :key="sub.id" class="subscription-card">
+                        <div class="card-content">
+                            <h3>{{ sub.keyword }}</h3>
+                            <p class="meta">创建于 {{ formatDate(sub.created_at) }}</p>
+                        </div>
+                        <div class="card-actions">
+                            <button 
+                                @click="toggleSubscription(sub)" 
+                                :class="['btn-toggle', sub.enabled ? 'active' : '']"
+                                :title="sub.enabled ? '禁用' : '启用'"
+                            >
+                                {{ sub.enabled ? '✓' : '✗' }}
+                            </button>
+                            <button 
+                                @click="deleteSubscription(sub.id)" 
+                                class="btn-delete"
+                                title="删除"
+                            >
+                                🗑
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Reports Section -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>📰 日报列表</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button @click="collectArticles" :disabled="collecting" class="btn btn-secondary">
+                            {{ collecting ? '搜集中...' : '📥 搜集资讯' }}
+                        </button>
+                        <button @click="generateReport" :disabled="generating" class="btn btn-primary">
+                            {{ generating ? '生成中...' : '⚡ 立即生成' }}
+                        </button>
+                    </div>
+                    </button>
+                </div>
+                
+                <div v-if="reports.length === 0" class="empty-state">
+                    <p>还没有生成任何日报</p>
+                </div>
+                
+                <div v-else class="reports-grid">
+                    <div v-for="report in reports" :key="report.id" class="report-card">
+                        <div class="card-content">
+                            <h3>{{ report.keyword }}</h3>
+                            <p class="meta">
+                                📅 {{ report.date }}<br>
+                                📊 {{ report.article_count }} 篇文章<br>
+                                🕒 {{ formatDateTime(report.generated_at) }}
+                            </p>
+                        </div>
+                        <div class="card-actions">
+                            <button @click="viewReport(report)" class="btn btn-view">
+                                查看
+                            </button>
+                            <button @click="downloadReport(report.id)" class="btn btn-download">
+                                下载
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Schedule Section -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>⏰ 定时设置</h2>
+                </div>
+                
+                <div class="schedule-config">
+                    <div class="form-group">
+                        <label>生成时间</label>
+                        <input 
+                            type="time" 
+                            v-model="schedule.time" 
+                            @change="updateSchedule"
+                            class="input-time"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input 
+                                type="checkbox" 
+                                v-model="schedule.enabled" 
+                                @change="updateSchedule"
+                            >
+                            启用定时生成
+                        </label>
+                    </div>
+                    <p class="schedule-info">
+                        {{ schedule.enabled ? `每天 ${schedule.time} 自动生成日报` : '定时生成已禁用' }}
+                    </p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Add Subscription Dialog -->
+        <div v-if="showAddDialog" class="modal-overlay" @click.self="showAddDialog = false">
+            <div class="modal">
+                <h3>添加订阅</h3>
+                <form @submit.prevent="addSubscription">
+                    <div class="form-group">
+                        <label>关键词</label>
+                        <input 
+                            type="text" 
+                            v-model="newKeyword" 
+                            placeholder="例如: AI, Python, 区块链"
+                            maxlength="50"
+                            required
+                            class="input"
+                        >
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" @click="showAddDialog = false" class="btn">
+                            取消
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            添加
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Report Viewer Modal -->
+        <div v-if="viewingReport" class="modal-overlay" @click.self="viewingReport = null">
+            <div class="modal modal-large">
+                <div class="modal-header">
+                    <div class="modal-header-left">
+                        <h3>{{ viewingReport.keyword }} - {{ viewingReport.date }}</h3>
+                    </div>
+                    <div class="modal-header-right">
+                        <button @click="downloadReportHtml(viewingReport.id)" class="btn-download">
+                            📄 下载HTML
+                        </button>
+                        <button @click="downloadReportAsPng(viewingReport.id)" class="btn-download">
+                            🖼️ 下载为PNG
+                        </button>
+                        <button @click="viewingReport = null" class="btn-close">✕</button>
+                    </div>
+                </div>
+                <iframe 
+                    ref="reportIframe"
+                    :src="`/api/reports/${viewingReport.id}/view`"
+                    class="report-iframe"
+                ></iframe>
+            </div>
+        </div>
+
+        <!-- Notification Toast -->
+        <div v-if="notification" :class="['notification', notification.type]">
+            {{ notification.message }}
+        </div>
+
+        <!-- Log Panel -->
+        <div class="log-panel" :class="{ 'collapsed': logCollapsed }">
+            <div class="log-header" @click="logCollapsed = !logCollapsed">
+                <div class="log-title">
+                    <span>📋 操作日志</span>
+                    <span class="log-count">({{ logs.length }})</span>
+                </div>
+                <button class="log-toggle">{{ logCollapsed ? '展开' : '收起' }}</button>
+            </div>
+            <div v-if="!logCollapsed" class="log-content">
+                <div class="log-actions">
+                    <button @click="clearLogs" class="btn-clear-logs">🗑️ 清空</button>
+                    <button @click="autoScroll = !autoScroll" :class="['btn-auto-scroll', { active: autoScroll }]">
+                        {{ autoScroll ? '📌 自动滚动' : '📍 停止滚动' }}
+                    </button>
+                </div>
+                <div class="log-list" ref="logList">
+                    <div v-if="logs.length === 0" class="log-empty">
+                        暂无日志
+                    </div>
+                    <div 
+                        v-for="(log, index) in logs" 
+                        :key="index" 
+                        :class="['log-item', `log-${log.level}`]">
+                        <span class="log-time">{{ log.time }}</span>
+                        <span class="log-level">{{ log.levelText }}</span>
+                        <span class="log-message">{{ log.message }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

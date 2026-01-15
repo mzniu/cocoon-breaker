@@ -1,0 +1,225 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <!-- Define gradients -->
+    <defs>
+        <radialGradient id="pinkGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:rgba(255,100,150,0.9);stop-opacity:1" />
+            <stop offset="100%" style="stop-color:rgba(255,0,100,0.6);stop-opacity:1" />
+        </radialGradient>
+        <radialGradient id="blueGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:rgba(100,230,255,0.9);stop-opacity:1" />
+            <stop offset="100%" style="stop-color:rgba(0,150,255,0.6);stop-opacity:1" />
+        </radialGradient>
+        <radialGradient id="purpleGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:rgba(200,100,255,0.9);stop-opacity:1" />
+            <stop offset="100%" style="stop-color:rgba(130,0,200,0.6);stop-opacity:1" />
+        </radialGradient>
+        <radialGradient id="orangeGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:rgba(255,200,100,0.9);stop-opacity:1" />
+            <stop offset="100%" style="stop-color:rgba(255,130,0,0.6);stop-opacity:1" />
+        </radialGradient>
+    </defs>
+    
+    <!-- Cocoon (white with stripes) -->
+    <ellipse cx="50" cy="55" rx="22" ry="30" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,1)" stroke-width="1.5"/>
+    
+    <!-- Horizontal stripes on cocoon -->
+    <line x1="30" y1="35" x2="70" y2="35" stroke="rgba(200,200,200,0.6)" stroke-width="1.5"/>
+    <line x1="28" y1="45" x2="72" y2="45" stroke="rgba(200,200,200,0.6)" stroke-width="1.5"/>
+    <line x1="28" y1="55" x2="72" y2="55" stroke="rgba(200,200,200,0.6)" stroke-width="1.5"/>
+    <line x1="28" y1="65" x2="72" y2="65" stroke="rgba(200,200,200,0.6)" stroke-width="1.5"/>
+    <line x1="30" y1="75" x2="70" y2="75" stroke="rgba(200,200,200,0.6)" stroke-width="1.5"/>
+    
+    <!-- Big crack (lightning shape, offset, thick to thin) -->
+    <!-- Upper thick part -->
+    <path d="M 52 28 L 48 38 L 54 45" 
+          fill="none" 
+          stroke="rgba(100,100,100,0.85)" 
+          stroke-width="12" 
+          stroke-linecap="round" 
+          stroke-linejoin="miter"/>
+    <!-- Middle part -->
+    <path d="M 54 45 L 47 58 L 52 68" 
+          fill="none" 
+          stroke="rgba(100,100,100,0.8)" 
+          stroke-width="8" 
+          stroke-linecap="round" 
+          stroke-linejoin="miter"/>
+    <!-- Lower thin part -->
+    <path d="M 52 68 L 48 78" 
+          fill="none" 
+          stroke="rgba(100,100,100,0.75)" 
+          stroke-width="4" 
+          stroke-linecap="round" 
+          stroke-linejoin="miter"/>
+    
+    <!-- Crack edges (jagged, larger) -->
+    <path d="M 50 32 L 44 35 M 56 40 L 62 43 M 43 52 L 37 55 M 58 56 L 64 59 M 50 65 L 44 68 M 56 73 L 62 76" 
+          stroke="rgba(100,100,100,0.6)" 
+          stroke-width="2.5" 
+          stroke-linecap="round"/>
+    
+    <!-- Golden butterfly emerging -->
+    <!-- Left upper wing (large) -->
+    <path d="M 47 15 Q 28 3, 18 11 Q 8 23, 17 34 Q 28 40, 45 31 Z" 
+          fill="rgba(255,215,0,0.9)" 
+          stroke="rgba(218,165,32,1)" 
+          stroke-width="1.5">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 19; -35 47 19; 0 47 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Left upper wing patterns (colorful with gradients) -->
+    <circle cx="23" cy="19" r="4" fill="url(#pinkGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 19; -35 47 19; 0 47 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    <circle cx="30" cy="27" r="3.5" fill="url(#blueGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 19; -35 47 19; 0 47 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    <ellipse cx="18" cy="29" rx="4.5" ry="3" fill="url(#purpleGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 19; -35 47 19; 0 47 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </ellipse>
+    <circle cx="26" cy="16" r="2.5" fill="url(#orangeGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 19; -35 47 19; 0 47 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    <ellipse cx="34" cy="33" rx="3" ry="2.5" fill="rgba(255,0,150,0.7)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 19; -35 47 19; 0 47 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </ellipse>
+    
+    <!-- Left lower wing (small) -->
+    <path d="M 47 23 Q 33 28, 26 37 Q 23 44, 31 49 Q 40 49, 47 40 Z" 
+          fill="rgba(255,215,0,0.85)" 
+          stroke="rgba(218,165,32,1)" 
+          stroke-width="1.5">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 27; -30 47 27; 0 47 27"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Left lower wing patterns -->
+    <circle cx="33" cy="40" r="3" fill="url(#orangeGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 27; -30 47 27; 0 47 27"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    <circle cx="28" cy="44" r="2.5" fill="url(#pinkGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 47 27; -30 47 27; 0 47 27"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Right upper wing (large) -->
+    <path d="M 53 15 Q 72 3, 82 11 Q 92 23, 83 34 Q 72 40, 55 31 Z"
+          fill="rgba(255,215,0,0.9)" 
+          stroke="rgba(218,165,32,1)" 
+          stroke-width="1.5">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 19; 35 53 19; 0 53 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Right upper wing patterns (colorful, symmetric) -->
+    <circle cx="77" cy="19" r="4" fill="url(#pinkGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 19; 35 53 19; 0 53 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    <circle cx="70" cy="27" r="3.5" fill="url(#blueGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 19; 35 53 19; 0 53 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    <ellipse cx="82" cy="29" rx="4.5" ry="3" fill="url(#purpleGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 19; 35 53 19; 0 53 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </ellipse>
+    <circle cx="74" cy="16" r="2.5" fill="url(#orangeGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 19; 35 53 19; 0 53 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    <ellipse cx="66" cy="33" rx="3" ry="2.5" fill="rgba(255,0,150,0.7)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 19; 35 53 19; 0 53 19"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </ellipse>
+    
+    <!-- Right lower wing (small) -->
+    <path d="M 53 23 Q 67 28, 74 37 Q 77 44, 69 49 Q 60 49, 53 40 Z" 
+          fill="rgba(255,215,0,0.85)" 
+          stroke="rgba(218,165,32,1)" 
+          stroke-width="1.5">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 27; 30 53 27; 0 53 27"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Right lower wing patterns -->
+    <circle cx="67" cy="40" r="3" fill="url(#orangeGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 27; 30 53 27; 0 53 27"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    <circle cx="72" cy="44" r="2.5" fill="url(#pinkGrad)">
+        <animateTransform attributeName="transform"
+                          type="rotate"
+                          values="0 53 27; 30 53 27; 0 53 27"
+                          dur="3s"
+                          repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Butterfly body (golden brown, longer) -->
+    <ellipse cx="50" cy="30" rx="3.5" ry="15" fill="rgba(184,134,11,1)"/>
+    
+    <!-- Antennae (golden brown, 60% longer total) -->
+    <path d="M 48 17 Q 45 12, 43 9" fill="none" stroke="rgba(184,134,11,1)" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="43" cy="9" r="1.5" fill="rgba(255,215,0,1)"/>
+    
+    <path d="M 52 17 Q 55 12, 57 9" fill="none" stroke="rgba(184,134,11,1)" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="57" cy="9" r="1.5" fill="rgba(255,215,0,1)"/>
+</svg>

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章浏览 - Cocoon Breaker</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .articles-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-item label {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .filter-item input,
+        .filter-item select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .stats {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .article-list {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .article-item {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s;
+        }
+
+        .article-item:last-child {
+            border-bottom: none;
+        }
+
+        .article-item:hover {
+            background-color: #f9f9f9;
+        }
+
+        .article-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .article-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin: 0 0 8px 0;
+        }
+
+        .article-title a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .article-title a:hover {
+            text-decoration: underline;
+        }
+
+        .article-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .article-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .article-content {
+            color: #555;
+            line-height: 1.6;
+            margin-top: 10px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .badge-baidu {
+            background: #e8f4fd;
+            color: #1890ff;
+        }
+
+        .badge-yahoo {
+            background: #f0e6ff;
+            color: #7c3aed;
+        }
+
+        .badge-google {
+            background: #e6f7ff;
+            color: #0066cc;
+        }
+
+        .badge-keyword {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .back-link {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="articles-container">
+            <div class="header">
+                <h1>📚 文章浏览</h1>
+                <a href="/static/index.html" class="back-link">← 返回首页</a>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label>关键词</label>
+                        <input 
+                            v-model="filters.keyword" 
+                            type="text" 
+                            placeholder="筛选关键词"
+                            style="width: 200px;"
+                        >
+                    </div>
+
+                    <div class="filter-item">
+                        <label>来源</label>
+                        <select v-model="filters.source" style="width: 120px;">
+                            <option value="">全部</option>
+                            <option value="baidu">百度</option>
+                            <option value="yahoo">Yahoo</option>
+                            <option value="google">Google</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-item">
+                        <label>时间范围</label>
+                        <select v-model="filters.hours" style="width: 150px;">
+                            <option value="">全部时间</option>
+                            <option value="6">最近 6 小时</option>
+                            <option value="12">最近 12 小时</option>
+                            <option value="24">最近 24 小时</option>
+                            <option value="48">最近 48 小时</option>
+                            <option value="168">最近 7 天</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-item">
+                        <label>显示数量</label>
+                        <input 
+                            v-model.number="filters.limit" 
+                            type="number" 
+                            min="10" 
+                            max="500" 
+                            style="width: 100px;"
+                        >
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button @click="loadArticles" class="btn btn-primary">
+                        🔍 搜索
+                    </button>
+                    <button @click="resetFilters" class="btn btn-secondary">
+                        🔄 重置
+                    </button>
+                    <button @click="cleanupOldArticles" class="btn btn-danger">
+                        🗑️ 清理旧文章
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats" v-if="articles.length > 0">
+                共找到 <strong>{{ total }}</strong> 篇文章
+            </div>
+
+            <!-- Loading -->
+            <div v-if="loading" class="loading">
+                ⏳ 加载中...
+            </div>
+
+            <!-- Article List -->
+            <div v-else-if="articles.length > 0" class="article-list">
+                <div 
+                    v-for="article in articles" 
+                    :key="article.id" 
+                    class="article-item"
+                >
+                    <div class="article-header">
+                        <h3 class="article-title">
+                            <a :href="article.url" target="_blank">{{ article.title }}</a>
+                        </h3>
+                    </div>
+
+                    <div class="article-meta">
+                        <span class="badge" :class="'badge-' + article.source">
+                            {{ getSourceName(article.source) }}
+                        </span>
+                        <span class="badge badge-keyword">
+                            🏷️ {{ article.keyword }}
+                        </span>
+                        <span>
+                            🕐 {{ formatTime(article.crawled_at) }}
+                        </span>
+                        <span>
+                            🆔 ID: {{ article.id }}
+                        </span>
+                    </div>
+
+                    <div class="article-content">
+                        {{ article.content.substring(0, 300) }}{{ article.content.length > 300 ? '...' : '' }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div v-else-if="!loading" class="empty">
+                <div class="empty-icon">📭</div>
+                <p>暂无文章数据</p>
+                <p style="font-size: 0.9em; color: #aaa;">
+                    尝试调整筛选条件或添加订阅后生成日报
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    loading: false,
+                    articles: [],
+                    total: 0,
+                    filters: {
+                        keyword: '',
+                        source: '',
+                        hours: '',
+                        limit: 100
+                    }
+                };
+            },
+            mounted() {
+                this.loadArticles();
+            },
+            methods: {
+                async loadArticles() {
+                    this.loading = true;
+                    try {
+                        const params = new URLSearchParams();
+                        
+                        if (this.filters.keyword) {
+                            params.append('keyword', this.filters.keyword);
+                        }
+                        if (this.filters.source) {
+                            params.append('source', this.filters.source);
+                        }
+                        if (this.filters.hours) {
+                            params.append('hours', this.filters.hours);
+                        }
+                        params.append('limit', this.filters.limit);
+
+                        const response = await fetch(`/api/articles?${params}`);
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            this.articles = data.items;
+                            this.total = data.total;
+                        } else {
+                            alert('加载文章失败: ' + (data.detail || '未知错误'));
+                        }
+                    } catch (error) {
+                        console.error('Error loading articles:', error);
+                        alert('加载文章失败: ' + error.message);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                resetFilters() {
+                    this.filters = {
+                        keyword: '',
+                        source: '',
+                        hours: '',
+                        limit: 100
+                    };
+                    this.loadArticles();
+                },
+                
+                async cleanupOldArticles() {
+                    const days = prompt('删除多少天前的文章？', '30');
+                    if (!days) return;
+                    
+                    if (!confirm(`确定要删除 ${days} 天前的所有文章吗？此操作不可恢复！`)) {
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/api/articles/cleanup?days=${days}`, {
+                            method: 'DELETE'
+                        });
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            alert(`成功删除 ${data.deleted_count} 篇文章`);
+                            this.loadArticles();
+                        } else {
+                            alert('删除失败: ' + (data.detail || '未知错误'));
+                        }
+                    } catch (error) {
+                        console.error('Error cleaning up articles:', error);
+                        alert('删除失败: ' + error.message);
+                    }
+                },
+                
+                formatTime(isoString) {
+                    if (!isoString) return '未知';
+                    const date = new Date(isoString);
+                    const now = new Date();
+                    const diff = now - date;
+                    
+                    const minutes = Math.floor(diff / 60000);
+                    const hours = Math.floor(diff / 3600000);
+                    const days = Math.floor(diff / 86400000);
+                    
+                    if (minutes < 60) {
+                        return `${minutes} 分钟前`;
+                    } else if (hours < 24) {
+                        return `${hours} 小时前`;
+                    } else if (days < 7) {
+                        return `${days} 天前`;
+                    } else {
+                        return date.toLocaleDateString('zh-CN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                    }
+                },
+                
+                getSourceName(source) {
+                    const sourceMap = {
+                        'baidu': '百度',
+                        'yahoo': 'Yahoo',
+                        'google': 'Google'
+                    };
+                    return sourceMap[source] || source;
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

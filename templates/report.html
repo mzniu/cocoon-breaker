@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI信息差日报 - {{date}}</title>
+    <style>
+        html {
+            height: 100%;
+        }
+        
+        body {
+            width: 1080px;  /* 页面总宽度 */
+            min-height: 1440px; /* 最小高度1440px，内容超出时自动扩展 */
+            margin: 0 auto; /* 水平居中 */
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "微软雅黑", SimHei, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(to bottom, #f8f9fa, #ffffff); /* 微妙渐变背景 */
+            padding: 15px;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 标题栏样式 - 左右布局 */
+        .header {
+            background-color: #e60012;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px 8px 0 0; /* 仅上圆角，与下方模块衔接 */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            border: 2px solid #e60012; /* 统一边框，方便衔接 */
+            border-bottom: none; /* 与省流版必读无缝衔接 */
+            box-shadow: 0 4px 12px rgba(230, 0, 18, 0.15); /* 立体阴影 */
+        }
+
+        /* 标题+关键字容器 - 占页面一半宽度 */
+        .title-wrapper {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            width: 55%; /* 容器占页面一半宽度 */
+        }
+
+        /* 标题行（标题+国际版banner） */
+        .title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 15px;
+        }
+
+        /* AI信息差标题 - 放大字号+占满容器宽度 */
+        .title {
+            font-size: 118px; /* 大幅增大字号 */
+            font-weight: bold;
+            line-height: 1.1; /* 调整行高避免文字溢出 */
+            letter-spacing: 5px; /* 增加字间距更醒目 */
+        }
+
+        /* 新闻关键字样式 */
+        .keywords {
+            font-size: 28px;
+            color: rgba(255, 255, 255, 0.9);
+            margin-top: 10px;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            width: 100%; /* 跟随标题容器宽度 */
+            white-space: nowrap; /* 防止换行 */
+        }
+
+        /* 关键字标签标题 */
+        .keywords-label {
+            font-weight: bold;
+            color: #fff; /* 纯色更醒目 */
+            white-space: nowrap; /* 防止换行 */
+        }
+
+        /* 关键字标签样式 */
+        .keyword-tag {
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 4px 6px;
+            border-radius: 20px;
+        }
+
+        /* 右侧信息方块 - 自适应剩余宽度 */
+        .info-card {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px 12px;
+            min-width: 280px;
+            flex-shrink: 0; /* 防止被挤压 */
+        }
+
+        /* 信息方块内的文本样式 */
+        .card-item {
+            font-size: 35px;
+            margin-bottom: 8px; /* 调整间距适配单条日期 */
+            display: flex; /* 确保布局正常 */
+            justify-content: center; /* 日期居中显示 */
+        }
+        .card-content {
+            flex: 1;
+            text-align: center; /* 日期居中 */
+        }
+
+        /* 新增banner样式 */
+        .card-banner {
+            font-size: 30px;
+            font-weight: bold;
+            text-align: center;
+            padding: 5px 0;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        /* 底部小牛聊AI banner样式 */
+        .footer-banner {
+            background-color: #e60012;
+            color: white;
+            font-size: 30px;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px 0;
+            border-radius: 8px;
+            letter-spacing: 1px;
+            box-shadow: 0 -2px 8px rgba(230, 0, 18, 0.2); /* 向上投射阴影 */
+            margin-top: auto; /* 在info-list内部自动推到底部 */
+            margin-left: -25px; /* 抵消父容器padding，让banner横跨整个宽度 */
+            margin-right: -25px;
+            margin-bottom: -20px; /* 抵消底部padding，让banner贴底 */
+            border-radius: 0 0 6px 6px; /* 匹配父容器底部圆角 */
+        }
+
+        /* 省流版必读样式 - 一行布局+醒目 */
+        .today-must-read {
+            background: linear-gradient(to right, #fff5f5, #ffffff); /* 渐变背景 */
+            color: #e60012; /* 文字用主题红，醒目且不重合 */
+            padding: 20px 30px;
+            border: 2px solid #e60012; /* 统一边框 */
+            border-top: none; /* 与标题栏无缝衔接 */
+            border-bottom: none; /* 与info-list无缝衔接 */
+            margin-bottom: 0;
+            box-shadow: 0 3px 8px rgba(230, 0, 18, 0.12); /* 增强阴影 */
+            display: flex; /* 一行布局 */
+            align-items: center;
+            gap: 15px; /* 标题与内容间距 */
+        }
+
+        .must-read-title {
+            font-size: 36px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap; /* 防止标题换行 */
+            flex-shrink: 0; /* 防止标题被挤压 */
+        }
+
+        /* 警示图标强化醒目效果 */
+        .must-read-title::before {
+            content: "❗";
+            font-size: 42px;
+            line-height: 1;
+        }
+
+        .must-read-content {
+            font-size: 28px;
+            line-height: 1.5;
+            color: #333; /* 内容用深灰，提升可读性 */
+            flex: 1; /* 占剩余宽度，自适应换行 */
+        }
+
+        /* 信息列表样式 */
+        .info-list {
+            border: 2px solid #e60012; /* 统一边框 */
+            border-radius: 0 0 8px 8px; /* 仅下圆角，与上方模块衔接 */
+            padding: 20px 25px;
+            background-color: #fff;
+            counter-reset: news-counter;
+            flex: 1; /* 占据剩余空间，扩展到底部 */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* 立体阴影 */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-item {
+            margin-bottom: 10px;
+            color: #333;
+            border-bottom: 1px solid transparent;
+            border-image: linear-gradient(to right, #e60012, transparent) 1; /* 渐变分隔线 */
+            padding-bottom: 15px;
+            position: relative;
+            padding-left: 35px;
+            counter-increment: news-counter;
+            transition: background-color 0.2s ease; /* 悬停过渡 */
+        }
+
+        .info-item:hover {
+            background-color: #fafafa; /* 悬停微变色 */
+        }
+
+        .info-item:before {
+            content: counter(news-counter);
+            position: absolute;
+            left: -5px;
+            top: 5px;
+            font-size: 35px;
+            font-weight: bold;
+            color: #e60012;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+            background-color: #fff;
+        }
+
+        .info-item:last-child {
+            margin-bottom: 0;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .info-subtitle {
+            font-size: 30px;
+            font-weight: bold;
+            color: #222;
+            margin-bottom: 6px;
+            line-height: 1.2;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 重要度标记样式 */
+        .priority-badge {
+            font-size: 18px;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .info-content {
+            font-size: 26px;
+            color: #333;
+            position: relative;
+        }
+
+        /* 来源标注样式 */
+        .source-tag {
+            display: inline-block;
+            font-size: 20px;
+            color: #999;
+            margin-left: 8px;
+            padding: 2px 8px;
+            background-color: #8edef7f5;
+            border-radius: 4px;
+            font-weight: normal;
+        }
+
+        .highlight {
+            color: #e60012;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <!-- 左侧标题+关键字区域 -->
+        <div class="title-wrapper">
+            <!-- 标题行：仅标题 -->
+            <div class="title-row">
+                <h1 class="title">AI 信息差</h1>
+            </div>
+            <!-- 新闻关键字区域 -->
+            <div class="keywords">
+                <span class="keywords-label">关键字：</span>
+                {{#each keywords}}
+                <span class="keyword-tag">{{this}}</span>
+                {{/each}}
+            </div>
+        </div>
+        
+        <div class="info-card">
+            <div class="card-item">
+                <span class="card-content">{{date}}</span>
+            </div>
+            <div class="card-banner">[{{weekday}}]</div>
+        </div>
+    </div>
+
+    <!-- 省流版必读醒目条目（一行布局） -->
+    <div class="today-must-read">
+        <div class="must-read-title">省流版必读</div>
+        <div class="must-read-content">{{summary}}</div>
+    </div>
+
+    <div class="info-list">
+        {{#each articles}}
+        <div class="info-item">
+            <h3 class="info-subtitle">
+                <span class="priority-badge">{{priority_icon}}</span>
+                {{title}}
+                <span class="source-tag">{{source}}</span>
+            </h3>
+            <p class="info-content">{{{content}}}</p>
+        </div>
+        {{/each}}
+        
+        <!-- 底部banner -->
+        <div class="footer-banner">@小牛聊AI</div>  
+    </div>
+</body>
+</html>

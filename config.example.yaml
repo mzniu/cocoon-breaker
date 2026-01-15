@@ -1,0 +1,107 @@
+# ========================================
+# Cocoon Breaker 配置文件模板
+# ========================================
+# 使用说明：
+# 1. 复制此文件为 config.yaml
+# 2. 修改相应配置项
+# 3. 敏感信息（如 API Key）使用环境变量 ${VAR_NAME}
+# ========================================
+
+# 服务器配置
+server:
+  host: 127.0.0.1          # 监听地址（0.0.0.0 允许外部访问）
+  port: 8000                # 监听端口
+  debug: false              # 调试模式（开发时设为 true，生产环境必须为 false）
+
+# 订阅管理
+subscriptions:
+  max_keywords: 5           # 最大订阅数量限制（避免爬虫负载过高）
+  default_keywords:         # 默认订阅示例（可选，首次使用时参考）
+    - 人工智能
+    - 大模型
+
+# 定时任务配置
+schedule:
+  default_time: "08:00"     # 每日自动生成日报时间（24小时制，格式：HH:MM）
+  enabled: true             # 是否启用定时任务（false 则仅支持手动触发）
+
+# 日报输出配置
+output:
+  format: html              # 输出格式（当前仅支持 html）
+  directory: ./reports      # 日报保存目录（相对或绝对路径）
+  template: ./templates/report.html  # HTML 模板文件路径（供 LLM 参考）
+
+# LLM 配置（Deepseek AI）
+llm:
+  provider: deepseek        # AI 服务提供商（当前仅支持 deepseek）
+  api_key: ${DEEPSEEK_API_KEY}  # API Key（必须通过环境变量设置，不要硬编码！）
+  model: deepseek-reasoner     # 使用的模型名称
+  base_url: https://api.deepseek.com  # API 基础 URL
+  timeout: 30               # API 请求超时时间（秒），建议 30-60
+  max_retries: 3            # 失败重试次数（避免临时网络问题）
+
+# 爬虫配置
+crawler:
+  sources:                  # 启用的信息源（baidu 和 bing 对中国区友好）
+    - baidu
+    - bing
+  request_interval: [1, 3]  # 请求间隔随机范围（秒），避免被反爬
+  max_results_per_keyword: 20  # 每个关键词每个源爬取的最大结果数（建议 10-30）
+  max_results_per_source: 10   # 每个信息源返回的最大结果数
+  timeout: 10               # 单个爬虫请求超时时间（秒）
+  user_agents:              # User-Agent 轮换列表（模拟真实浏览器）
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    - "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+# Google Custom Search API 配置（可选）
+google:
+  enabled: true            # 是否启用 Google 搜索
+  api_key: ${GOOGLE_API_KEY}  # Google API Key（通过环境变量设置）
+  search_engine_id: ${GOOGLE_SEARCH_ENGINE_ID}  # 搜索引擎 ID
+
+# Tavily API 配置（可选）
+tavily:
+  enabled: true            # 是否启用 Tavily 搜索
+  api_key: ${TAVILY_API_KEY}  # Tavily API Key（通过环境变量设置）
+  search_depth: advanced    # 搜索深度：basic 或 advanced
+  max_results: 20           # 每次搜索最大结果数
+
+# 数据库配置
+database:
+  path: ./data/cocoon.db    # SQLite 数据库文件路径（自动创建目录）
+
+# 日志配置
+logging:
+  level: INFO               # 日志级别：DEBUG（详细）、INFO（正常）、WARNING（警告）、ERROR（错误）
+  format: "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"  # 日志格式
+  file: ./logs/cocoon.log   # 日志文件路径（自动创建目录）
+  max_bytes: 10485760       # 单个日志文件最大大小（10MB，达到后自动轮转）
+  backup_count: 5           # 保留的日志文件数量（超过则删除最旧的）
+
+# ========================================
+# 配置说明：
+# ========================================
+# 
+# 环境变量替换：
+#   配置中的 ${VAR_NAME} 会自动替换为环境变量的值
+#   示例：${DEEPSEEK_API_KEY} 会读取环境变量 DEEPSEEK_API_KEY
+#
+# 路径配置：
+#   相对路径基于项目根目录
+#   建议使用相对路径，便于项目迁移
+#
+# 性能调优：
+#   - max_keywords: 订阅数↑ → 爬取时间↑ → 建议 ≤5
+#   - max_results_per_keyword: 结果数↑ → 质量↑但时间↑ → 建议 10-30
+#   - request_interval: 间隔↓ → 速度↑但易被封 → 建议 ≥1秒
+#   - timeout: 超时↑ → 成功率↑但响应慢 → 建议 30-60秒
+#
+# 生产环境建议：
+#   ✅ server.debug: false
+#   ✅ server.host: 0.0.0.0（允许外部访问）
+#   ✅ logging.level: INFO 或 WARNING
+#   ✅ 使用环境变量存储敏感信息
+#   ✅ 定期备份 data/ 目录（数据库）
+#   ✅ 配置日志轮转，避免磁盘占满
+# ========================================
