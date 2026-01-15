@@ -131,6 +131,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Block direct access to /static/index.html (redirect to root)
+@app.get("/static/index.html", tags=["System"])
+async def block_static_index():
+    """Redirect /static/index.html to root"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/", status_code=301)
+
+# Block direct access to /static/articles.html (redirect to /articles.html)
+@app.get("/static/articles.html", tags=["System"])
+async def block_static_articles():
+    """Redirect /static/articles.html to /articles.html"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/articles.html", status_code=301)
+
 # Mount static files
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
@@ -167,6 +181,20 @@ async def root():
     """Root endpoint - serve index.html"""
     from fastapi.responses import FileResponse
     return FileResponse("src/static/index.html")
+
+
+@app.get("/index.html", tags=["System"])
+async def index():
+    """Index page - serve index.html"""
+    from fastapi.responses import FileResponse
+    return FileResponse("src/static/index.html")
+
+
+@app.get("/articles.html", tags=["System"])
+async def articles():
+    """Articles page - serve articles.html"""
+    from fastapi.responses import FileResponse
+    return FileResponse("src/static/articles.html")
 
 
 def get_db() -> Database:

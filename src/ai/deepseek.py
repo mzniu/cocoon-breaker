@@ -185,7 +185,7 @@ class ArticleFilter:
         from datetime import datetime
         
         articles_text = "\n\n".join([
-            f"[{idx}] 标题：{article.title}\n内容：{article.content[:500]}\n来源：{article.source}"
+            f"[{idx}] 标题：{article.title}\n内容：{article.content[:500]}\n来源：{article.source}\n爬取时间：{article.crawled_at.strftime('%Y-%m-%d %H:%M:%S')}"
             for idx, article in enumerate(articles)
         ])
         
@@ -202,11 +202,13 @@ class ArticleFilter:
 3. 每条新闻的content内容不要超过120字。
 4. **每条新闻的标题不要超过25个字，去掉标题中的新闻来源（如"央视新闻"、"新华社"等）。**
 5. **优先选择知名企业和人物相关的新闻。**
-6. **按照知名度由高到低对新闻进行排序。**
+6. **优先选择爬取时间最近的新闻，在同等质量和重要性的情况下，选择更新的内容。**
+7. **按照新闻重要性和时效性综合排序，时效性越强的新闻优先级越高。**
 
 ## 注意：
 - 查看具体内容是否与"{keyword}"关系密切，而不是只看到标题有相关字样就算做符合条件。
 - 去掉台湾相关企业及信息。
+- 新闻的时效性非常重要，爬取时间越晚的新闻说明发布越新，应该优先考虑。
 
 ## 限制:
 - 仅返回{target_count}条新闻。

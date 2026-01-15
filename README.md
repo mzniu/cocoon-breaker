@@ -4,7 +4,8 @@
 
 ## ✨ 功能特性
 
-- 🔍 **多源信息爬取**：百度 + Yahoo + Google API（可选）
+- 🔍 **多源信息爬取**：百度 + Yahoo + Google API（可选） + Tavily API（可选） + 36氪 RSS + 虎嗅网 RSS
+- 🔥 **新闻时效性优化**：时间过滤 + AI 时间优先级 + 混合评分系统（质量权重 0.7 + 时效权重 0.3）
 - 🤖 **AI 智能筛选**：Deepseek 驱动的内容相关性与重要性分析
 - 📊 **精美日报**：HTML 格式，1080x1440px 移动端友好设计
 - ⏰ **定时自动化**：每日定时自动生成，schedule 调度器
@@ -24,7 +25,7 @@
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/yourusername/cocoon-breaker.git
+git clone https://github.com/mzniu/cocoon-breaker.git
 cd cocoon-breaker
 
 # 2. 创建虚拟环境
@@ -114,6 +115,31 @@ google:
 - ✅ 国内可访问（无需代理）
 - ✅ 结果质量最高
 
+### 配置 Tavily 搜索（可选）
+
+Tavily 是一个专为 AI 优化的搜索 API，支持深度搜索：
+
+**1. 获取 API Key：**
+- 访问 [Tavily AI](https://tavily.com/)
+- 注册并获取 API Key
+
+**2. 设置环境变量：**
+```powershell
+# Windows PowerShell
+$env:TAVILY_API_KEY="tvly-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Linux/macOS
+export TAVILY_API_KEY="tvly-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+**3. 启用 Tavily：**
+编辑 `config.yaml`：
+```yaml
+tavily:
+  enabled: true
+  search_depth: advanced  # basic 或 advanced
+```
+
 ### 运行服务
 
 > **⚠️ 运行前检查**：确保已设置 `DEEPSEEK_API_KEY` 环境变量（见上方配置说明）
@@ -159,7 +185,10 @@ cocoon-breaker/
 │   │   ├── base.py           # 抽象基类
 │   │   ├── baidu.py          # 百度搜索
 │   │   ├── yahoo.py          # Yahoo 搜索
-│   │   └── google.py         # Google API
+│   │   ├── google.py         # Google API
+│   │   ├── tavily.py         # Tavily API
+│   │   ├── kr36.py           # 36氪 RSS
+│   │   └── huxiu.py          # 虎嗅网 RSS
 │   ├── db/                   # 数据库层
 │   │   ├── models.py         # 数据模型
 │   │   ├── database.py       # 连接管理
@@ -307,15 +336,89 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 - **数据存储**：SQLite 适合单机部署，大规模使用请考虑 PostgreSQL
 - **安全性**：生产环境请使用 HTTPS，配置防火墙规则
 
+## 🆕 新增功能
+
+### 🔥 新闻时效性优化
+
+针对“信息茧房”问题，新增三层时效性优化：
+
+**1. 时间过滤配置**
+```yaml
+report:
+  time_range_hours: 24  # 只选择最近24小时的新闻（0=不限制）
+```
+
+**2. AI 时间优先级**
+- AI 提示词自动强调时效性
+- 爬取时间作为上下文传递给 AI
+- 同等质量下优先选择更新的内容
+
+**3. 混合评分系统**
+```yaml
+report:
+  quality_weight: 0.7        # 内容质量权重
+  freshness_weight: 0.3      # 时效权重
+  time_decay_lambda: 0.1     # 时间衰减系数
+```
+
+评分公式：`最终得分 = 质量权重 × 质量分 + 时效权重 × e^(-λ × 小时数)`
+
+时间衰减示例（λ=0.1）：
+- 1小时前：90%新鲜度
+- 6小时前：55%新鲜度
+- 12小时前：30%新鲜度
+- 24小时前：9%新鲜度
+
+详细文档：[docs/NEWS_FRESHNESS_FEATURE.md](docs/NEWS_FRESHNESS_FEATURE.md)
+
+### 🆕 新增信息源
+
+**36氪 (36Kr)**
+- 科技创业、商业资讯
+- RSS: https://36kr.com/feed
+- 原创深度分析，行业洞察
+
+**虎嗅网 (Huxiu)**
+- 商业科技深度报道
+- RSS: https://www.huxiu.com/rss/0.xml
+- 独立观点，商业洞察力强
+
+**Tavily API**
+- 专为 AI 优化的搜索 API
+- 支持 advanced 深度搜索
+- 适合全网智能搜索
+
+配置示例：
+```yaml
+kr36:
+  enabled: true
+  max_results: 20
+
+huxiu:
+  enabled: true
+  max_results: 20
+
+tavily:
+  enabled: true
+  api_key: ${TAVILY_API_KEY}
+  search_depth: advanced
+```
+
+详细文档：
+- [docs/36KR_THEPAPER_INTEGRATION.md](docs/36KR_THEPAPER_INTEGRATION.md)
+- [docs/TAVILY_SETUP.md](docs/TAVILY_SETUP.md)
+
+## ⚠️ 使用注意
+
+- **API 限流**：Deepseek API 有调用频率限制，请合理设置订阅数量
+- **爬虫礼仪**：请求间隔 1-3 秒，避免过于频繁访问
+- **数据存储**：SQLite 适合单机部署，大规模使用请考虑 PostgreSQL
+- **安全性**：生产环境请使用 HTTPS，配置防火墙规则
+
 ## 📞 联系方式
 
-- 项目主页: [GitHub](https://github.com/yourusername/cocoon-breaker)
-- 问题反馈: [Issues](https://github.com/yourusername/cocoon-breaker/issues)
-- 邮箱: your.email@example.com
+- 项目主页: [GitHub](https://github.com/mzniu/cocoon-breaker)
+- 问题反馈: [Issues](https://github.com/mzniu/cocoon-breaker/issues)
+- 邮箱: aindy.niu@gmail.com
 
----
 
-**Made with ❤️ by the Cocoon Breaker Team**
-
-- 作者：[待填写]
-- 邮箱：[待填写]

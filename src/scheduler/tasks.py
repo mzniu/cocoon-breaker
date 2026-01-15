@@ -118,6 +118,34 @@ class DailyReportTask:
         else:
             logger.info("Tavily crawler disabled (not enabled in config or API key not set)")
         
+        # Add 36Kr crawler if enabled in config
+        if self.config.kr36.enabled:
+            try:
+                from src.crawler.kr36 import Kr36Crawler
+                kr36_crawler = Kr36Crawler(
+                    user_agents=self.config.crawler.user_agents,
+                    request_interval=self.config.crawler.request_interval,
+                    timeout=self.config.crawler.timeout
+                )
+                self.crawlers.append(kr36_crawler)
+                logger.info("36Kr RSS crawler enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize 36Kr crawler: {e}")
+        
+        # Add Huxiu crawler if enabled in config
+        if self.config.huxiu.enabled:
+            try:
+                from src.crawler.huxiu import HuxiuCrawler
+                huxiu_crawler = HuxiuCrawler(
+                    user_agents=self.config.crawler.user_agents,
+                    request_interval=self.config.crawler.request_interval,
+                    timeout=self.config.crawler.timeout
+                )
+                self.crawlers.append(huxiu_crawler)
+                logger.info("Huxiu (虎嗅网) RSS crawler enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Huxiu crawler: {e}")
+        
         logger.info("DailyReportTask initialized")
     
     async def cleanup(self):
@@ -174,11 +202,22 @@ class DailyReportTask:
         saved_count = await self._save_articles(articles)
         logger.info(f"Saved {saved_count}/{len(articles)} articles for {keyword}")
         
-        # Step 3: Get recent articles for report
-        recent_articles = await self.article_repo.get_recent_by_keyword(
+        # Step 3: Get recent articles for report with scoring
+        time_range = self.config.report.time_range_hours
+        
+        # Use mixed scoring for better article selection
+        recent_articles = await self.article_repo.get_by_keyword_with_scoring(
             keyword,
-            hours=24
+            hours=time_range,
+            quality_weight=self.config.report.quality_weight,
+            freshness_weight=self.config.report.freshness_weight,
+            time_decay_lambda=self.config.report.time_decay_lambda
         )
+        
+        if time_range > 0:
+            logger.info(f"Found {len(recent_articles)} articles within {time_range} hours for {keyword} (scored)")
+        else:
+            logger.info(f"Found {len(recent_articles)} articles (no time limit) for {keyword} (scored)")
         
         if not recent_articles:
             logger.warning(f"No recent articles for {keyword}")

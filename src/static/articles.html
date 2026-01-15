@@ -7,25 +7,68 @@
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        .articles-container {
-            max-width: 1200px;
-            margin: 0 auto;
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             padding: 20px;
         }
 
+        .articles-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
         .header {
+            text-align: center;
+            color: white;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            padding: 20px 0;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .filters {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+        }
+
+        .quick-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .quick-filter-btn {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+        
+        .quick-filter-btn:hover {
+            background: #f0f0f0;
+            border-color: #667eea;
+        }
+        
+        .quick-filter-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
         }
 
         .filter-row {
@@ -61,32 +104,32 @@
         }
 
         .stats {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            font-size: 0.9em;
-            color: #666;
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 0.95em;
+            color: #333;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .article-list {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
         .article-item {
+            background: white;
             padding: 20px;
-            border-bottom: 1px solid #eee;
-            transition: background-color 0.2s;
-        }
-
-        .article-item:last-child {
-            border-bottom: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
         }
 
         .article-item:hover {
-            background-color: #f9f9f9;
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
         .article-header {
@@ -104,12 +147,13 @@
         }
 
         .article-title a {
-            color: #007bff;
+            color: #667eea;
             text-decoration: none;
         }
 
         .article-title a:hover {
             text-decoration: underline;
+            color: #764ba2;
         }
 
         .article-meta {
@@ -118,6 +162,7 @@
             font-size: 0.85em;
             color: #666;
             margin-bottom: 10px;
+            flex-wrap: wrap;
         }
 
         .article-meta span {
@@ -131,6 +176,19 @@
             line-height: 1.6;
             margin-top: 10px;
         }
+        
+        .expand-btn {
+            color: #007bff;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 8px;
+            display: inline-block;
+            user-select: none;
+        }
+        
+        .expand-btn:hover {
+            text-decoration: underline;
+        }
 
         .badge {
             display: inline-block;
@@ -138,89 +196,261 @@
             border-radius: 3px;
             font-size: 0.8em;
             font-weight: 500;
+            color: white;
         }
 
         .badge-baidu {
-            background: #e8f4fd;
-            color: #1890ff;
+            background: linear-gradient(135deg, #2478ff 0%, #0055d4 100%);
         }
 
         .badge-yahoo {
-            background: #f0e6ff;
-            color: #7c3aed;
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
         }
 
         .badge-google {
-            background: #e6f7ff;
-            color: #0066cc;
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+        }
+        
+        .badge-tavily {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
+        }
+        
+        .badge-kr36 {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+        }
+        
+        .badge-huxiu {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
 
         .badge-keyword {
-            background: #f0f0f0;
-            color: #666;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .badge-score-high {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            font-weight: bold;
+        }
+        
+        .badge-score-medium {
+            background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%);
+        }
+        
+        .badge-score-low {
+            background: linear-gradient(135deg, #757575 0%, #9e9e9e 100%);
+        }
+        
+        .keyword-highlight {
+            background-color: #ffeb3b;
+            color: #000;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-weight: 500;
         }
 
         .loading {
             text-align: center;
-            padding: 40px;
+            padding: 60px 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             color: #666;
         }
 
         .empty {
             text-align: center;
-            padding: 60px 20px;
+            padding: 80px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             color: #999;
         }
 
         .empty-icon {
-            font-size: 48px;
-            margin-bottom: 10px;
+            font-size: 64px;
+            margin-bottom: 20px;
         }
 
         .btn {
-            padding: 8px 16px;
+            padding: 10px 20px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 0.95rem;
             transition: all 0.3s;
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn:hover {
+            background: #d0d0d0;
         }
 
         .btn-primary {
-            background: #007bff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
 
         .btn-primary:hover {
-            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         .btn-secondary {
-            background: #6c757d;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
         }
 
         .btn-secondary:hover {
-            background: #545b62;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         .btn-danger {
-            background: #dc3545;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
         }
 
         .btn-danger:hover {
-            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         .back-link {
-            color: #007bff;
+            color: white;
             text-decoration: none;
-            font-size: 0.9em;
+            font-size: 16px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            transition: all 0.3s;
+            display: inline-block;
         }
 
         .back-link:hover {
-            text-decoration: underline;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 24px;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .pagination-info {
+            color: #666;
+            font-size: 0.9em;
+            margin-right: 15px;
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .page-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: #f0f0f0;
+            border-color: #667eea;
+            transform: translateY(-1px);
+        }
+
+        .page-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+            font-weight: bold;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .page-ellipsis {
+            padding: 8px 4px;
+            color: #999;
+        }
+
+        .page-size-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 1px solid #ddd;
+        }
+
+        .page-size-selector label {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .page-size-selector select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .page-jump {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 1px solid #ddd;
+        }
+
+        .page-jump label {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .page-jump input {
+            width: 60px;
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .page-jump button {
+            padding: 6px 12px;
+            border: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .page-jump button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
     </style>
 </head>
@@ -229,11 +459,23 @@
         <div class="articles-container">
             <div class="header">
                 <h1>📚 文章浏览</h1>
-                <a href="/static/index.html" class="back-link">← 返回首页</a>
+                <a href="/" class="back-link">← 返回首页</a>
             </div>
 
             <!-- Filters -->
             <div class="filters">
+                <!-- Quick Filters -->
+                <div class="quick-filters">
+                    <button 
+                        v-for="qf in quickFilters" 
+                        :key="qf.label"
+                        @click="applyQuickFilter(qf)"
+                        :class="['quick-filter-btn', {active: isQuickFilterActive(qf)}]"
+                    >
+                        {{ qf.label }}
+                    </button>
+                </div>
+                
                 <div class="filter-row">
                     <div class="filter-item">
                         <label>关键词</label>
@@ -242,6 +484,7 @@
                             type="text" 
                             placeholder="筛选关键词"
                             style="width: 200px;"
+                            ref="keywordInput"
                         >
                     </div>
 
@@ -252,19 +495,38 @@
                             <option value="baidu">百度</option>
                             <option value="yahoo">Yahoo</option>
                             <option value="google">Google</option>
+                            <option value="tavily">Tavily</option>
+                            <option value="kr36">36氪</option>
+                            <option value="huxiu">虎嗅</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-item">
+                        <label>排序</label>
+                        <select v-model="filters.sortBy" style="width: 150px;">
+                            <option value="time_desc">时间↓ (新→旧)</option>
+                            <option value="time_asc">时间↑ (旧→新)</option>
+                            <option value="score_desc">评分↓ (高→低)</option>
+                            <option value="score_asc">评分↑ (低→高)</option>
                         </select>
                     </div>
 
                     <div class="filter-item">
-                        <label>时间范围</label>
-                        <select v-model="filters.hours" style="width: 150px;">
-                            <option value="">全部时间</option>
-                            <option value="6">最近 6 小时</option>
-                            <option value="12">最近 12 小时</option>
-                            <option value="24">最近 24 小时</option>
-                            <option value="48">最近 48 小时</option>
-                            <option value="168">最近 7 天</option>
-                        </select>
+                        <label>开始日期</label>
+                        <input 
+                            v-model="filters.startDate" 
+                            type="date" 
+                            style="width: 150px;"
+                        >
+                    </div>
+                    
+                    <div class="filter-item">
+                        <label>结束日期</label>
+                        <input 
+                            v-model="filters.endDate" 
+                            type="date" 
+                            style="width: 150px;"
+                        >
                     </div>
 
                     <div class="filter-item">
@@ -280,11 +542,8 @@
                 </div>
 
                 <div class="btn-group">
-                    <button @click="loadArticles" class="btn btn-primary">
-                        🔍 搜索
-                    </button>
                     <button @click="resetFilters" class="btn btn-secondary">
-                        🔄 重置
+                        🔄 重置筛选
                     </button>
                     <button @click="cleanupOldArticles" class="btn btn-danger">
                         🗑️ 清理旧文章
@@ -305,13 +564,13 @@
             <!-- Article List -->
             <div v-else-if="articles.length > 0" class="article-list">
                 <div 
-                    v-for="article in articles" 
+                    v-for="article in paginatedArticles" 
                     :key="article.id" 
                     class="article-item"
                 >
                     <div class="article-header">
                         <h3 class="article-title">
-                            <a :href="article.url" target="_blank">{{ article.title }}</a>
+                            <a :href="article.url" target="_blank" v-html="highlightKeyword(article.title)"></a>
                         </h3>
                     </div>
 
@@ -322,6 +581,9 @@
                         <span class="badge badge-keyword">
                             🏷️ {{ article.keyword }}
                         </span>
+                        <span v-if="article.score !== undefined" class="badge" :class="getScoreBadgeClass(article.score)">
+                            ⭐ {{ article.score.toFixed(2) }}
+                        </span>
                         <span>
                             🕐 {{ formatTime(article.crawled_at) }}
                         </span>
@@ -331,8 +593,101 @@
                     </div>
 
                     <div class="article-content">
-                        {{ article.content.substring(0, 300) }}{{ article.content.length > 300 ? '...' : '' }}
+                        <div v-html="highlightKeyword(article.expanded ? article.content : getPreviewContent(article.content))"></div>
+                        <span 
+                            v-if="article.content && article.content.length > 200"
+                            @click="toggleExpand(article)"
+                            class="expand-btn"
+                        >
+                            {{ article.expanded ? '▲ 收起' : '▼ 展开全文' }}
+                        </span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div v-if="articles.length > 0" class="pagination">
+                <div class="pagination-info">
+                    显示 {{ (currentPage - 1) * pageSize + 1 }}-{{ Math.min(currentPage * pageSize, articles.length) }} / 共 {{ articles.length }} 篇
+                </div>
+                
+                <div class="pagination-controls">
+                    <!-- 首页 -->
+                    <button 
+                        class="page-btn" 
+                        @click="goToPage(1)"
+                        :disabled="currentPage === 1"
+                        title="首页"
+                    >
+                        ⏮️
+                    </button>
+                    
+                    <!-- 上一页 -->
+                    <button 
+                        class="page-btn" 
+                        @click="goToPage(currentPage - 1)"
+                        :disabled="currentPage === 1"
+                        title="上一页"
+                    >
+                        ◀️
+                    </button>
+                    
+                    <!-- 页码 -->
+                    <template v-for="page in visiblePages" :key="page">
+                        <button 
+                            v-if="page !== '...'"
+                            class="page-btn"
+                            :class="{active: currentPage === page}"
+                            @click="goToPage(page)"
+                        >
+                            {{ page }}
+                        </button>
+                        <span v-else class="page-ellipsis">...</span>
+                    </template>
+                    
+                    <!-- 下一页 -->
+                    <button 
+                        class="page-btn" 
+                        @click="goToPage(currentPage + 1)"
+                        :disabled="currentPage === totalPages"
+                        title="下一页"
+                    >
+                        ▶️
+                    </button>
+                    
+                    <!-- 末页 -->
+                    <button 
+                        class="page-btn" 
+                        @click="goToPage(totalPages)"
+                        :disabled="currentPage === totalPages"
+                        title="末页"
+                    >
+                        ⏭️
+                    </button>
+                </div>
+                
+                <!-- 每页显示数量 -->
+                <div class="page-size-selector">
+                    <label>每页</label>
+                    <select v-model.number="pageSize" @change="changePageSize">
+                        <option :value="10">10条</option>
+                        <option :value="20">20条</option>
+                        <option :value="50">50条</option>
+                        <option :value="100">100条</option>
+                    </select>
+                </div>
+                
+                <!-- 跳转到指定页 -->
+                <div class="page-jump">
+                    <label>跳转</label>
+                    <input 
+                        v-model.number="jumpToPage" 
+                        type="number" 
+                        min="1" 
+                        :max="totalPages"
+                        @keyup.enter="jumpTo"
+                    >
+                    <button @click="jumpTo">GO</button>
                 </div>
             </div>
 
@@ -359,15 +714,116 @@
                     filters: {
                         keyword: '',
                         source: '',
-                        hours: '',
-                        limit: 100
-                    }
+                        startDate: '',
+                        endDate: '',
+                        limit: 100,
+                        sortBy: 'time_desc'
+                    },
+                    debounceTimer: null,
+                    // Pagination
+                    currentPage: 1,
+                    pageSize: 20,
+                    jumpToPage: 1,
+                    quickFilters: [
+                        { label: '📅 今日', hours: 24 },
+                        { label: '📆 本周', hours: 168 },
+                        { label: '📊 本月', hours: 720 },
+                        { label: '🔵 百度', source: 'baidu' },
+                        { label: '🟣 Yahoo', source: 'yahoo' },
+                        { label: '🔴 Google', source: 'google' },
+                        { label: '🟢 Tavily', source: 'tavily' },
+                        { label: '🟠 36氪', source: 'kr36' },
+                        { label: '🟡 虎嗅', source: 'huxiu' }
+                    ]
                 };
+            },
+            computed: {
+                // 当前页显示的文章
+                paginatedArticles() {
+                    const start = (this.currentPage - 1) * this.pageSize;
+                    const end = start + this.pageSize;
+                    return this.articles.slice(start, end);
+                },
+                // 总页数
+                totalPages() {
+                    return Math.ceil(this.articles.length / this.pageSize);
+                },
+                // 显示的页码列表（智能省略）
+                visiblePages() {
+                    const total = this.totalPages;
+                    const current = this.currentPage;
+                    const pages = [];
+                    
+                    if (total <= 7) {
+                        // 总页数少，显示全部
+                        for (let i = 1; i <= total; i++) {
+                            pages.push(i);
+                        }
+                    } else {
+                        // 总页数多，智能省略
+                        // 始终显示第1页
+                        pages.push(1);
+                        
+                        if (current > 3) {
+                            pages.push('...');
+                        }
+                        
+                        // 显示当前页附近的页码
+                        const start = Math.max(2, current - 1);
+                        const end = Math.min(total - 1, current + 1);
+                        
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        
+                        if (current < total - 2) {
+                            pages.push('...');
+                        }
+                        
+                        // 始终显示最后一页
+                        if (total > 1) {
+                            pages.push(total);
+                        }
+                    }
+                    
+                    return pages;
+                }
             },
             mounted() {
                 this.loadArticles();
+                document.addEventListener('keydown', this.handleKeyboard);
+            },
+            beforeUnmount() {
+                document.removeEventListener('keydown', this.handleKeyboard);
+            },
+            watch: {
+                'filters.keyword': function(newVal, oldVal) {
+                    this.debouncedLoadArticles();
+                },
+                'filters.source': function(newVal, oldVal) {
+                    this.loadArticles();
+                },
+                'filters.startDate': function(newVal, oldVal) {
+                    this.loadArticles();
+                },
+                'filters.endDate': function(newVal, oldVal) {
+                    this.loadArticles();
+                },
+                'filters.limit': function(newVal, oldVal) {
+                    this.loadArticles();
+                },
+                'filters.sortBy': function(newVal, oldVal) {
+                    this.sortArticles();
+                }
             },
             methods: {
+                debouncedLoadArticles() {
+                    clearTimeout(this.debounceTimer);
+                    this.debounceTimer = setTimeout(() => {
+                        this.loadArticles();
+                    }, 500);
+                },
+                
                 async loadArticles() {
                     this.loading = true;
                     try {
@@ -379,17 +835,44 @@
                         if (this.filters.source) {
                             params.append('source', this.filters.source);
                         }
-                        if (this.filters.hours) {
-                            params.append('hours', this.filters.hours);
+                        
+                        // 将日期转换为hours参数（API兼容性）
+                        if (this.filters.startDate || this.filters.endDate) {
+                            const now = new Date();
+                            const start = this.filters.startDate ? new Date(this.filters.startDate) : null;
+                            const end = this.filters.endDate ? new Date(this.filters.endDate + ' 23:59:59') : null;
+                            
+                            if (start) {
+                                const hoursAgo = Math.floor((now - start) / 3600000);
+                                params.append('hours', hoursAgo);
+                            }
                         }
+                        
                         params.append('limit', this.filters.limit);
 
                         const response = await fetch(`/api/articles?${params}`);
                         const data = await response.json();
 
                         if (response.ok) {
-                            this.articles = data.items;
+                            // 添加expanded属性
+                            this.articles = data.items.map(article => ({
+                                ...article,
+                                expanded: false
+                            }));
                             this.total = data.total;
+                            
+                            // 如果有endDate，前端过滤
+                            if (this.filters.endDate) {
+                                const endTime = new Date(this.filters.endDate + ' 23:59:59');
+                                this.articles = this.articles.filter(article => {
+                                    const articleTime = new Date(article.crawled_at);
+                                    return articleTime <= endTime;
+                                });
+                                this.total = this.articles.length;
+                            }
+                            
+                            this.sortArticles();
+                            this.resetPagination(); // 重新加载数据后重置分页
                         } else {
                             alert('加载文章失败: ' + (data.detail || '未知错误'));
                         }
@@ -405,8 +888,10 @@
                     this.filters = {
                         keyword: '',
                         source: '',
-                        hours: '',
-                        limit: 100
+                        startDate: '',
+                        endDate: '',
+                        limit: 100,
+                        sortBy: 'time_desc'
                     };
                     this.loadArticles();
                 },
@@ -468,9 +953,125 @@
                     const sourceMap = {
                         'baidu': '百度',
                         'yahoo': 'Yahoo',
-                        'google': 'Google'
+                        'google': 'Google',
+                        'tavily': 'Tavily',
+                        'kr36': '36氪',
+                        'huxiu': '虎嗅'
                     };
                     return sourceMap[source] || source;
+                },
+                
+                getScoreBadgeClass(score) {
+                    if (score >= 0.7) return 'badge-score-high';
+                    if (score >= 0.4) return 'badge-score-medium';
+                    return 'badge-score-low';
+                },
+                
+                sortArticles() {
+                    const sortBy = this.filters.sortBy;
+                    
+                    this.articles.sort((a, b) => {
+                        if (sortBy === 'time_desc') {
+                            return new Date(b.crawled_at) - new Date(a.crawled_at);
+                        } else if (sortBy === 'time_asc') {
+                            return new Date(a.crawled_at) - new Date(b.crawled_at);
+                        } else if (sortBy === 'score_desc') {
+                            const scoreA = a.score !== undefined ? a.score : -1;
+                            const scoreB = b.score !== undefined ? b.score : -1;
+                            return scoreB - scoreA;
+                        } else if (sortBy === 'score_asc') {
+                            const scoreA = a.score !== undefined ? a.score : 999;
+                            const scoreB = b.score !== undefined ? b.score : 999;
+                            return scoreA - scoreB;
+                        }
+                        return 0;
+                    });
+                },
+                
+                highlightKeyword(text) {
+                    if (!this.filters.keyword || !text) return text;
+                    const keyword = this.filters.keyword.trim();
+                    if (!keyword) return text;
+                    
+                    const regex = new RegExp(`(${keyword})`, 'gi');
+                    return text.replace(regex, '<span class="keyword-highlight">$1</span>');
+                },
+                
+                getPreviewContent(content) {
+                    if (!content) return '';
+                    return content.substring(0, 300) + (content.length > 300 ? '...' : '');
+                },
+                
+                toggleExpand(article) {
+                    article.expanded = !article.expanded;
+                },
+                
+                applyQuickFilter(qf) {
+                    if (qf.hours) {
+                        // 时间快捷筛选
+                        const now = new Date();
+                        const startDate = new Date(now.getTime() - qf.hours * 3600000);
+                        this.filters.startDate = startDate.toISOString().split('T')[0];
+                        this.filters.endDate = now.toISOString().split('T')[0];
+                        this.filters.source = '';
+                    } else if (qf.source) {
+                        // 来源快捷筛选
+                        if (this.filters.source === qf.source) {
+                            this.filters.source = ''; // 取消选择
+                        } else {
+                            this.filters.source = qf.source;
+                        }
+                    }
+                },
+                
+                isQuickFilterActive(qf) {
+                    if (qf.source) {
+                        return this.filters.source === qf.source;
+                    }
+                    return false;
+                },
+                
+                handleKeyboard(e) {
+                    // Ctrl+F 聚焦搜索
+                    if (e.ctrlKey && e.key === 'f') {
+                        e.preventDefault();
+                        this.$refs.keywordInput?.focus();
+                    }
+                    // Esc 清空筛选
+                    if (e.key === 'Escape') {
+                        this.resetFilters();
+                    }
+                },
+                
+                // === 分页方法 ===
+                goToPage(page) {
+                    if (page < 1 || page > this.totalPages) return;
+                    this.currentPage = page;
+                    this.jumpToPage = page;
+                    // 滚动到页面顶部
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                },
+                
+                changePageSize() {
+                    // 调整每页显示数量时，尝试保持当前显示的第一条文章
+                    const firstItemIndex = (this.currentPage - 1) * this.pageSize;
+                    this.currentPage = Math.floor(firstItemIndex / this.pageSize) + 1;
+                    this.jumpToPage = this.currentPage;
+                },
+                
+                jumpTo() {
+                    const page = parseInt(this.jumpToPage);
+                    if (isNaN(page) || page < 1 || page > this.totalPages) {
+                        alert(`请输入1-${this.totalPages}之间的页码`);
+                        this.jumpToPage = this.currentPage;
+                        return;
+                    }
+                    this.goToPage(page);
+                },
+                
+                resetPagination() {
+                    this.currentPage = 1;
+                    this.jumpToPage = 1;
                 }
             }
         }).mount('#app');

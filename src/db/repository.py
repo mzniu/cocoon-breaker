@@ -72,6 +72,75 @@ class ArticleRepository:
         rows = await cursor.fetchall()
         return [self._row_to_article(row) for row in rows]
     
+    async def get_by_keyword_with_scoring(
+        self, 
+        keyword: str, 
+        hours: int = 24, 
+        quality_weight: float = 0.7,
+        freshness_weight: float = 0.3,
+        time_decay_lambda: float = 0.1,
+        limit: int = 100
+    ) -> List[Article]:
+        """
+        Get articles by keyword with mixed quality and freshness scoring
+        
+        Score formula: final_score = quality_weight * quality_score + freshness_weight * freshness_score
+        where freshness_score = e^(-lambda * hours_old)
+        
+        Args:
+            keyword: Search keyword
+            hours: Time range in hours (0 = no limit)
+            quality_weight: Weight for quality score (0-1)
+            freshness_weight: Weight for freshness score (0-1)
+            time_decay_lambda: Decay rate for time-based scoring
+            limit: Maximum number of results
+            
+        Returns:
+            List of articles sorted by final score (descending)
+        """
+        import math
+        
+        # Get articles (with or without time filter)
+        if hours > 0:
+            articles = await self.get_recent_by_keyword(keyword, hours, limit * 2)  # Get more for scoring
+        else:
+            articles = await self.get_by_keyword(keyword, limit * 2)
+        
+        if not articles:
+            return []
+        
+        # Calculate scores for each article
+        now = datetime.now()
+        scored_articles = []
+        
+        for article in articles:
+            # Calculate hours since crawled
+            time_diff = now - article.crawled_at
+            hours_old = time_diff.total_seconds() / 3600
+            
+            # Quality score (based on content length and source - simple heuristic)
+            content_length = len(article.content)
+            quality_score = min(1.0, content_length / 1000)  # Normalize to 0-1
+            
+            # Known sources get bonus
+            if article.source in ['baidu', 'bing', 'google', 'tavily']:
+                quality_score *= 1.2
+                quality_score = min(1.0, quality_score)
+            
+            # Freshness score with exponential decay: e^(-lambda * hours_old)
+            freshness_score = math.exp(-time_decay_lambda * hours_old)
+            
+            # Final score
+            final_score = (quality_weight * quality_score + 
+                          freshness_weight * freshness_score)
+            
+            scored_articles.append((final_score, article))
+        
+        # Sort by score (descending) and return top results
+        scored_articles.sort(key=lambda x: x[0], reverse=True)
+        return [article for _, article in scored_articles[:limit]]
+    
+    
     async def get_all(self, limit: int = 100) -> List[Article]:
         """Get all articles"""
         cursor = await self.db.conn.execute("""

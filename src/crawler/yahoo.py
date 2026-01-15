@@ -40,7 +40,7 @@ class YahooCrawler(BaseCrawler):
             # Visit homepage first to get cookies
             try:
                 self._make_request("https://search.yahoo.com/")
-                self._random_sleep()
+                self._random_delay()
             except Exception as e:
                 logger.warning(f"Failed to visit Yahoo homepage: {e}")
             

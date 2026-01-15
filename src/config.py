@@ -41,6 +41,15 @@ class OutputConfig:
 
 
 @dataclass
+class ReportConfig:
+    """Report generation configuration"""
+    time_range_hours: int = 24
+    quality_weight: float = 0.7
+    freshness_weight: float = 0.3
+    time_decay_lambda: float = 0.1
+
+
+@dataclass
 class LLMConfig:
     """LLM configuration"""
     provider: str = "deepseek"
@@ -79,6 +88,20 @@ class TavilyConfig:
 
 
 @dataclass
+class Kr36Config:
+    """36Kr RSS configuration"""
+    enabled: bool = True
+    max_results: int = 20
+
+
+@dataclass
+class HuxiuConfig:
+    """Huxiu (虎嗅网) RSS configuration - 商业科技深度报道"""
+    enabled: bool = True
+    max_results: int = 20
+
+
+@dataclass
 class DatabaseConfig:
     """Database configuration"""
     path: str = "./data/cocoon.db"
@@ -106,6 +129,7 @@ class Config:
         self.subscriptions = SubscriptionConfig(default_keywords=[])
         self.schedule = ScheduleConfig()
         self.output = OutputConfig()
+        self.report = ReportConfig()
         self.llm = LLMConfig()
         self.crawler = CrawlerConfig(
             sources=["baidu", "bing"],
@@ -117,6 +141,8 @@ class Config:
         )
         self.google = GoogleConfig()
         self.tavily = TavilyConfig()
+        self.kr36 = Kr36Config()
+        self.huxiu = HuxiuConfig()
         self.database = DatabaseConfig()
         self.logging = LoggingConfig()
         
@@ -143,10 +169,13 @@ class Config:
             self._load_subscriptions()
             self._load_schedule()
             self._load_output()
+            self._load_report()
             self._load_llm()
             self._load_crawler()
             self._load_google()
             self._load_tavily()
+            self._load_kr36()
+            self._load_huxiu()
             self._load_database()
             self._load_logging()
             
@@ -208,6 +237,15 @@ class Config:
             self.output.directory = cfg.get('directory', self.output.directory)
             self.output.template = cfg.get('template', self.output.template)
     
+    def _load_report(self):
+        """Load report configuration"""
+        if 'report' in self._raw_config:
+            cfg = self._raw_config['report']
+            self.report.time_range_hours = cfg.get('time_range_hours', self.report.time_range_hours)
+            self.report.quality_weight = cfg.get('quality_weight', self.report.quality_weight)
+            self.report.freshness_weight = cfg.get('freshness_weight', self.report.freshness_weight)
+            self.report.time_decay_lambda = cfg.get('time_decay_lambda', self.report.time_decay_lambda)
+    
     def _load_llm(self):
         """Load LLM configuration"""
         if 'llm' in self._raw_config:
@@ -246,6 +284,20 @@ class Config:
             self.tavily.enabled = cfg.get('enabled', self.tavily.enabled)
             self.tavily.search_depth = cfg.get('search_depth', self.tavily.search_depth)
             self.tavily.max_results = cfg.get('max_results', self.tavily.max_results)
+    
+    def _load_kr36(self):
+        """Load 36Kr configuration"""
+        if 'kr36' in self._raw_config:
+            cfg = self._raw_config['kr36']
+            self.kr36.enabled = cfg.get('enabled', self.kr36.enabled)
+            self.kr36.max_results = cfg.get('max_results', self.kr36.max_results)
+    
+    def _load_huxiu(self):
+        """Load Huxiu configuration"""
+        if 'huxiu' in self._raw_config:
+            cfg = self._raw_config['huxiu']
+            self.huxiu.enabled = cfg.get('enabled', self.huxiu.enabled)
+            self.huxiu.max_results = cfg.get('max_results', self.huxiu.max_results)
     
     def _load_database(self):
         """Load database configuration"""
