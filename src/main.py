@@ -2,10 +2,15 @@
 FastAPI main application
 """
 import sys
+import asyncio
 import logging
 import logging.handlers
 from pathlib import Path
 from contextlib import asynccontextmanager
+
+# Set Windows event loop policy for Playwright subprocess support
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 # Add project root to path for direct execution
 if __name__ == "__main__":

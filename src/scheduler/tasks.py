@@ -146,6 +146,20 @@ class DailyReportTask:
             except Exception as e:
                 logger.warning(f"Failed to initialize Huxiu crawler: {e}")
         
+        # Add Toutiao crawler if enabled in config
+        if self.config.toutiao.enabled:
+            try:
+                from src.crawler.toutiao import ToutiaoCrawler
+                toutiao_crawler = ToutiaoCrawler(
+                    user_agents=self.config.crawler.user_agents,
+                    request_interval=self.config.crawler.request_interval,
+                    timeout=self.config.crawler.timeout
+                )
+                self.crawlers.append(toutiao_crawler)
+                logger.info("Toutiao (今日头条) search crawler enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Toutiao crawler: {e}")
+        
         logger.info("DailyReportTask initialized")
     
     async def cleanup(self):
@@ -265,6 +279,14 @@ class DailyReportTask:
                 all_articles.extend(articles)
                 logger.info(f"Crawled {len(articles)} articles from {crawler.__class__.__name__}")
                 
+                # Log detailed article list for debugging
+                if articles:
+                    logger.info(f"[{crawler.__class__.__name__}] Article list:")
+                    for i, article in enumerate(articles, 1):
+                        logger.info(f"  [{i}] {article.title[:80]}")
+                        logger.info(f"      URL: {article.url}")
+                        logger.info(f"      Source: {article.source} | Published: {article.published_at}")
+                
             except Exception as e:
                 logger.error(f"Crawler {crawler.__class__.__name__} failed: {e}")
                 continue
@@ -272,10 +294,37 @@ class DailyReportTask:
         return all_articles
     
     async def _save_articles(self, articles: List[Article]) -> int:
-        """Save articles to database"""
-        saved_count = 0
+        """Save articles to database with deduplication logging"""
+        if not articles:
+            return 0
+        
+        # Step 1: Batch check for duplicates
+        logger.info(f"[DEDUP] Checking {len(articles)} articles for duplicates...")
+        urls = [article.url for article in articles]
+        existing_urls = await self.article_repo.check_urls_exist(urls)
+        
+        # Separate new and duplicate articles
+        new_articles = []
+        duplicate_count = 0
         
         for article in articles:
+            if article.url in existing_urls:
+                duplicate_count += 1
+                logger.info(f"[DEDUP] ✗ DUPLICATE skipped: {article.title[:60]}")
+                logger.debug(f"[DEDUP]   URL: {article.url}")
+            else:
+                new_articles.append(article)
+        
+        logger.info(f"[DEDUP] Found {len(new_articles)} new articles, {duplicate_count} duplicates")
+        
+        if not new_articles:
+            logger.info(f"[DEDUP] Summary: 0 new, {duplicate_count} duplicates, {len(articles)} total")
+            return 0
+        
+        # Step 2: Save and analyze only new articles
+        saved_count = 0
+        
+        for i, article in enumerate(new_articles, 1):
             try:
                 article_id = await self.article_repo.create(article)
                 if article_id is not None:
@@ -284,6 +333,7 @@ class DailyReportTask:
                 logger.error(f"Failed to save article {article.url}: {e}")
                 continue
         
+        logger.info(f"[DEDUP] Summary: {saved_count} new, {duplicate_count} duplicates, {len(articles)} total")
         return saved_count
 
 

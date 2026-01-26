@@ -1,6 +1,7 @@
 """
 Articles API endpoints
 """
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -27,6 +28,16 @@ class ArticleResponse(BaseModel):
     crawled_at: str
     published_at: str | None
     score: float | None = None  # 时效性评分
+    full_content: str | None = None
+    fetch_status: str = 'pending'
+    fetched_at: str | None = None
+    fetch_error: str | None = None
+    # AI analysis fields
+    actual_published_at: str | None = None
+    actual_source: str | None = None
+    importance_score: float | None = None
+    analysis_status: str = 'pending'
+    analyzed_at: str | None = None
     
     class Config:
         from_attributes = True
@@ -38,11 +49,44 @@ class ArticleListResponse(BaseModel):
     items: list[ArticleResponse]
 
 
+class BatchAnalysisResponse(BaseModel):
+    """Response model for batch analysis"""
+    total: int
+    success: int
+    failed: int
+    skipped: int
+    message: str
+
+
 # Dependency to get database
 def get_db() -> Database:
     """Get database dependency"""
     from src.main import get_db as main_get_db
     return main_get_db()
+
+
+def article_to_response(article, score: float | None = None) -> ArticleResponse:
+    """Convert Article model to ArticleResponse"""
+    return ArticleResponse(
+        id=article.id,
+        title=article.title,
+        url=article.url,
+        content=article.content,
+        source=article.source,
+        keyword=article.keyword,
+        crawled_at=article.crawled_at.isoformat() if article.crawled_at else "",
+        published_at=article.published_at.isoformat() if article.published_at else None,
+        score=score,
+        full_content=article.full_content,
+        fetch_status=article.fetch_status,
+        fetched_at=article.fetched_at.isoformat() if article.fetched_at else None,
+        fetch_error=article.fetch_error,
+        actual_published_at=article.actual_published_at.isoformat() if article.actual_published_at else None,
+        actual_source=article.actual_source,
+        importance_score=article.importance_score,
+        analysis_status=article.analysis_status,
+        analyzed_at=article.analyzed_at.isoformat() if article.analyzed_at else None
+    )
 
 
 @router.get("", response_model=ArticleListResponse)
@@ -146,19 +190,7 @@ async def list_articles(
             quality_weight = 1.0 - freshness_weight
             final_score = quality_weight * quality_score + freshness_weight * freshness_score
             
-            items.append(
-                ArticleResponse(
-                    id=article.id,
-                    title=article.title,
-                    url=article.url,
-                    content=article.content,
-                    source=article.source,
-                    keyword=article.keyword,
-                    crawled_at=article.crawled_at.isoformat() if article.crawled_at else "",
-                    published_at=article.published_at.isoformat() if article.published_at else None,
-                    score=round(final_score, 4)  # 保留4位小数
-                )
-            )
+            items.append(article_to_response(article, score=round(final_score, 4)))
         
         logger.info(f"Retrieved {len(items)} articles with scores (keyword={keyword}, source={source}, hours={hours})")
         
@@ -199,16 +231,7 @@ async def get_article(
                 detail=f"Article {article_id} not found"
             )
         
-        return ArticleResponse(
-            id=article.id,
-            title=article.title,
-            url=article.url,
-            content=article.content,
-            source=article.source,
-            keyword=article.keyword,
-            crawled_at=article.crawled_at.isoformat() if article.crawled_at else "",
-            published_at=article.published_at.isoformat() if article.published_at else None
-        )
+        return article_to_response(article)
     
     except HTTPException:
         raise
@@ -251,4 +274,197 @@ async def cleanup_old_articles(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cleanup articles"
+        )
+
+
+@router.post("/{article_id}/fetch-content")
+async def fetch_article_content(
+    article_id: int,
+    db: Database = Depends(get_db)
+):
+    """
+    Fetch full content from article URL
+    
+    Path Parameters:
+        - article_id: Article ID
+    
+    Returns:
+        Updated article with full content
+    """
+    try:
+        repo = ArticleRepository(db)
+        
+        # Get article
+        article = await repo.get_by_id(article_id)
+        if not article:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Article {article_id} not found"
+            )
+        
+        # Check if already fetched successfully
+        if article.fetch_status == 'success' and article.full_content:
+            logger.info(f"Article {article_id} already has full content")
+            return {
+                "status": "already_fetched",
+                "message": "Article already has full content",
+                "article": article_to_response(article)
+            }
+        
+        # Fetch content using Selenium (sync method, run in thread)
+        from src.crawler.content_fetcher import ContentFetcher
+        fetcher = ContentFetcher()
+        result = await asyncio.to_thread(fetcher.fetch_content, article.url)
+        
+        # Update article
+        article.fetch_status = result['status']
+        article.fetched_at = datetime.now()
+        
+        if result['status'] == 'success':
+            article.full_content = result['content']
+            article.fetch_error = None
+            logger.info(f"Successfully fetched content for article {article_id}")
+        else:
+            article.fetch_error = result.get('error', 'Unknown error')
+            logger.warning(f"Failed to fetch content for article {article_id}: {article.fetch_error}")
+        
+        # Save to database
+        await repo.update_article_content(
+            article_id=article.id,
+            full_content=article.full_content,
+            fetch_status=article.fetch_status,
+            fetched_at=article.fetched_at,
+            fetch_error=article.fetch_error
+        )
+        
+        return {
+            "status": "success",
+            "message": "Content fetch completed",
+            "article": article_to_response(article)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch content for article {article_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch content: {str(e)}"
+        )
+
+
+@router.post("/batch-analyze", response_model=BatchAnalysisResponse)
+async def batch_analyze_articles(
+    status_filter: str = Query('pending', description="Analysis status filter: pending, failed, or all"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of articles to analyze"),
+    db: Database = Depends(get_db)
+):
+    """
+    Batch analyze articles that haven't been analyzed yet
+    
+    Query Parameters:
+        - status_filter: Filter by analysis_status (pending/failed/all)
+        - limit: Maximum number of articles to analyze (1-500)
+    
+    Returns:
+        Statistics of the batch analysis operation
+    """
+    try:
+        from src.ai.article_analyzer import ArticleAnalyzer
+        
+        repo = ArticleRepository(db)
+        analyzer = ArticleAnalyzer()
+        
+        # Get articles to analyze
+        if status_filter == 'pending':
+            articles = await repo.get_articles_by_analysis_status('pending', limit)
+        elif status_filter == 'failed':
+            articles = await repo.get_articles_by_analysis_status('failed', limit)
+        elif status_filter == 'all':
+            pending = await repo.get_articles_by_analysis_status('pending', limit // 2)
+            failed = await repo.get_articles_by_analysis_status('failed', limit // 2)
+            articles = pending + failed
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid status_filter. Must be 'pending', 'failed', or 'all'"
+            )
+        
+        total = len(articles)
+        success_count = 0
+        failed_count = 0
+        skipped_count = 0
+        
+        logger.info(f"[BATCH ANALYZE] Starting batch analysis for {total} articles (filter={status_filter})")
+        
+        # Analyze each article
+        for i, article in enumerate(articles, 1):
+            try:
+                logger.info(f"[BATCH ANALYZE] [{i}/{total}] Analyzing article {article.id}: {article.title[:50]}...")
+                
+                # Skip if already analyzed successfully
+                if article.analysis_status == 'success':
+                    logger.info(f"[BATCH ANALYZE] Article {article.id} already analyzed, skipping")
+                    skipped_count += 1
+                    continue
+                
+                # Analyze article
+                analysis = analyzer.analyze(
+                    title=article.title,
+                    content=article.content,
+                    crawled_at=article.crawled_at
+                )
+                
+                # Update database
+                await repo.update_article_analysis(
+                    article_id=article.id,
+                    actual_published_at=analysis.get('actual_published_at'),
+                    actual_source=analysis.get('actual_source'),
+                    importance_score=analysis.get('importance_score'),
+                    analysis_status=analysis.get('analysis_status'),
+                    analyzed_at=datetime.now()
+                )
+                
+                if analysis.get('analysis_status') == 'success':
+                    success_count += 1
+                    logger.info(f"[BATCH ANALYZE] ✓ Article {article.id} analyzed successfully")
+                else:
+                    failed_count += 1
+                    logger.warning(f"[BATCH ANALYZE] ✗ Article {article.id} analysis failed")
+                
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"[BATCH ANALYZE] Error analyzing article {article.id}: {e}")
+                
+                # Mark as failed in database
+                try:
+                    await repo.update_article_analysis(
+                        article_id=article.id,
+                        actual_published_at=None,
+                        actual_source=None,
+                        importance_score=50.0,
+                        analysis_status='failed',
+                        analyzed_at=datetime.now()
+                    )
+                except Exception as update_error:
+                    logger.error(f"[BATCH ANALYZE] Failed to update failed status for article {article.id}: {update_error}")
+        
+        message = f"Batch analysis completed: {success_count} succeeded, {failed_count} failed, {skipped_count} skipped"
+        logger.info(f"[BATCH ANALYZE] {message}")
+        
+        return BatchAnalysisResponse(
+            total=total,
+            success=success_count,
+            failed=failed_count,
+            skipped=skipped_count,
+            message=message
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch analysis failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Batch analysis failed: {str(e)}"
         )

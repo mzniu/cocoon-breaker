@@ -102,6 +102,13 @@ class HuxiuConfig:
 
 
 @dataclass
+class ToutiaoConfig:
+    """Toutiao (今日头条) search configuration"""
+    enabled: bool = True
+    max_results: int = 20
+
+
+@dataclass
 class DatabaseConfig:
     """Database configuration"""
     path: str = "./data/cocoon.db"
@@ -143,6 +150,7 @@ class Config:
         self.tavily = TavilyConfig()
         self.kr36 = Kr36Config()
         self.huxiu = HuxiuConfig()
+        self.toutiao = ToutiaoConfig()
         self.database = DatabaseConfig()
         self.logging = LoggingConfig()
         
@@ -176,6 +184,7 @@ class Config:
             self._load_tavily()
             self._load_kr36()
             self._load_huxiu()
+            self._load_toutiao()
             self._load_database()
             self._load_logging()
             
@@ -298,6 +307,13 @@ class Config:
             cfg = self._raw_config['huxiu']
             self.huxiu.enabled = cfg.get('enabled', self.huxiu.enabled)
             self.huxiu.max_results = cfg.get('max_results', self.huxiu.max_results)
+    
+    def _load_toutiao(self):
+        """Load Toutiao configuration"""
+        if 'toutiao' in self._raw_config:
+            cfg = self._raw_config['toutiao']
+            self.toutiao.enabled = cfg.get('enabled', self.toutiao.enabled)
+            self.toutiao.max_results = cfg.get('max_results', self.toutiao.max_results)
     
     def _load_database(self):
         """Load database configuration"""
