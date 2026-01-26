@@ -72,10 +72,8 @@ class Kr36Crawler(BaseCrawler):
             description = item.findtext('description', '').strip()
             pub_date_str = item.findtext('pubDate', '')
             
-            # Filter by keyword (case insensitive search in title and description)
-            keyword_lower = keyword.lower()
-            if keyword_lower not in title.lower() and keyword_lower not in description.lower():
-                return None
+            # RSS feeds are curated tech/business content, no keyword filtering needed
+            # Let AI filter content when generating reports
             
             # Parse publication date (RSS date format: Wed, 15 Jan 2026 10:00:00 +0800)
             published_at = None
@@ -101,7 +99,7 @@ class Kr36Crawler(BaseCrawler):
                 title=title,
                 url=link,
                 content=content if content else title,
-                source='36kr',
+                source='kr36',  # Use consistent source identifier
                 keyword=keyword,
                 crawled_at=datetime.now(),
                 published_at=published_at

@@ -41,13 +41,14 @@ class BaseCrawler(ABC):
         delay = random.uniform(self.request_interval[0], self.request_interval[1])
         time.sleep(delay)
     
-    def _make_request(self, url: str, params: dict = None) -> requests.Response:
+    def _make_request(self, url: str, params: dict = None, timeout: int = None) -> requests.Response:
         """
         Make HTTP request with random user agent
         
         Args:
             url: Request URL
             params: Query parameters
+            timeout: Optional timeout override (uses self.timeout if None)
             
         Returns:
             Response object
@@ -68,7 +69,7 @@ class BaseCrawler(ABC):
                 url,
                 params=params,
                 headers=headers,
-                timeout=self.timeout,
+                timeout=timeout if timeout is not None else self.timeout,
                 allow_redirects=True
             )
             response.raise_for_status()

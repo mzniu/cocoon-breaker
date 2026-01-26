@@ -34,7 +34,8 @@ class HuxiuCrawler(BaseCrawler):
         try:
             logger.info(f"Crawling Huxiu RSS for keyword: {keyword}")
             
-            response = self._make_request(self.RSS_URL)
+            # Huxiu may be slower, use longer timeout
+            response = self._make_request(self.RSS_URL, timeout=30)
             response.encoding = 'utf-8'
             
             # Parse RSS XML
@@ -73,10 +74,8 @@ class HuxiuCrawler(BaseCrawler):
             description = item.findtext('description', '').strip()
             pub_date_str = item.findtext('pubDate', '')
             
-            # Filter by keyword (case insensitive search in title and description)
-            keyword_lower = keyword.lower()
-            if keyword_lower not in title.lower() and keyword_lower not in description.lower():
-                return None
+            # RSS feeds are curated business/tech content, no keyword filtering needed
+            # Let AI filter content when generating reports
             
             # Parse publication date (RSS date format: Wed, 15 Jan 2026 10:00:00 +0800)
             published_at = None
