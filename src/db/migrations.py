@@ -50,7 +50,8 @@ class DatabaseMigration:
         migrations = [
             (1, self._migration_001_initial),
             (2, self._migration_002_add_score_cache),
-            # 添加更多迁移...
+            (3, self._migration_003_add_full_content_fields),
+            (4, self._migration_004_add_analysis_fields),
         ]
         
         # Apply pending migrations
@@ -82,6 +83,113 @@ class DatabaseMigration:
             ON articles(cached_score DESC) 
             WHERE cached_score IS NOT NULL
         """)
+    
+    async def _migration_003_add_full_content_fields(self, conn: aiosqlite.Connection):
+        """Add full content fetching related fields"""
+        # Add full_content field
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN full_content TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column full_content may already exist: {e}")
+        
+        # Add fetch_status field
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN fetch_status TEXT DEFAULT 'pending'
+            """)
+        except Exception as e:
+            logger.warning(f"Column fetch_status may already exist: {e}")
+        
+        # Add fetched_at field
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN fetched_at TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column fetched_at may already exist: {e}")
+        
+        # Add fetch_error field
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN fetch_error TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column fetch_error may already exist: {e}")
+        
+        # Create index for fetch_status
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_articles_fetch_status 
+            ON articles(fetch_status)
+        """)
+        
+        logger.info("Added full_content related fields to articles table")
+    
+    async def _migration_004_add_analysis_fields(self, conn: aiosqlite.Connection):
+        """Add AI analysis related fields"""
+        # Add actual_published_at field
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN actual_published_at TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column actual_published_at may already exist: {e}")
+        
+        # Add actual_source field
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN actual_source TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column actual_source may already exist: {e}")
+        
+        # Add importance_score field (0-100)
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN importance_score REAL
+            """)
+        except Exception as e:
+            logger.warning(f"Column importance_score may already exist: {e}")
+        
+        # Add analysis_status field
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN analysis_status TEXT DEFAULT 'pending'
+            """)
+        except Exception as e:
+            logger.warning(f"Column analysis_status may already exist: {e}")
+        
+        # Add analyzed_at field
+        try:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN analyzed_at TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column analyzed_at may already exist: {e}")
+        
+        # Create index for analysis_status
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_articles_analysis_status 
+            ON articles(analysis_status)
+        """)
+        
+        # Create index for importance_score
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_articles_importance_score 
+            ON articles(importance_score DESC)
+        """)
+        
+        logger.info("Added AI analysis related fields to articles table")
 
 
 async def run_migrations(db_path: str):

@@ -52,6 +52,10 @@ class Database:
                 keyword TEXT NOT NULL,
                 crawled_at TEXT NOT NULL,
                 published_at TEXT,
+                full_content TEXT,
+                fetch_status TEXT DEFAULT 'pending',
+                fetched_at TEXT,
+                fetch_error TEXT,
                 UNIQUE(url)
             )
         """)

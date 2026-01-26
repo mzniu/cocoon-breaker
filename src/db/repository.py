@@ -7,6 +7,7 @@ import logging
 
 from src.db.database import Database
 from src.db.models import Article, Subscription, Report, ScheduleConfig as ScheduleConfigModel
+from src.ai.article_analyzer import ArticleAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,28 @@ class ArticleRepository:
     
     def __init__(self, db: Database):
         self.db = db
+        self.analyzer = ArticleAnalyzer()
+    
+    async def check_urls_exist(self, urls: List[str]) -> set[str]:
+        """Check which URLs already exist in database
+        
+        Args:
+            urls: List of URLs to check
+            
+        Returns:
+            Set of URLs that already exist
+        """
+        if not urls:
+            return set()
+        
+        # Use IN clause for batch check
+        placeholders = ','.join(['?'] * len(urls))
+        cursor = await self.db.conn.execute(
+            f"SELECT url FROM articles WHERE url IN ({placeholders})",
+            urls
+        )
+        rows = await cursor.fetchall()
+        return {row[0] for row in rows}
     
     async def create(self, article: Article) -> Optional[int]:
         """
@@ -40,7 +63,43 @@ class ArticleRepository:
             await self.db.conn.commit()
             
             if cursor.rowcount > 0:
-                return cursor.lastrowid
+                article_id = cursor.lastrowid
+                logger.info(f"[DEDUP] ✓ NEW article inserted (ID={article_id}): {article.title[:60]}")
+                
+                # Analyze article immediately after creation
+                try:
+                    logger.info(f"[REPO] Analyzing article {article_id}: {article.title[:50]}...")
+                    analysis = self.analyzer.analyze(
+                        title=article.title,
+                        content=article.content,
+                        crawled_at=article.crawled_at
+                    )
+                    
+                    # Update article with analysis results
+                    await self.update_article_analysis(
+                        article_id=article_id,
+                        actual_published_at=analysis.get('actual_published_at'),
+                        actual_source=analysis.get('actual_source'),
+                        importance_score=analysis.get('importance_score'),
+                        analysis_status=analysis.get('analysis_status'),
+                        analyzed_at=datetime.now()
+                    )
+                    logger.info(f"[REPO] ✓ Article {article_id} analyzed successfully")
+                    
+                except Exception as e:
+                    logger.error(f"[REPO] Analysis failed for article {article_id}: {e}")
+                    # Don't fail article creation if analysis fails
+                    await self.update_article_analysis(
+                        article_id=article_id,
+                        actual_published_at=None,
+                        actual_source=None,
+                        importance_score=50.0,
+                        analysis_status='failed',
+                        analyzed_at=datetime.now()
+                    )
+                
+                return article_id
+            # Article was duplicate (INSERT OR IGNORE did nothing)
             return None
             
         except Exception as e:
@@ -161,6 +220,18 @@ class ArticleRepository:
         row = await cursor.fetchone()
         return self._row_to_article(row) if row else None
     
+    async def get_articles_by_analysis_status(self, status: str, limit: int = 100) -> List[Article]:
+        """Get articles by analysis status"""
+        cursor = await self.db.conn.execute("""
+            SELECT * FROM articles 
+            WHERE analysis_status = ?
+            ORDER BY crawled_at DESC
+            LIMIT ?
+        """, (status, limit))
+        
+        rows = await cursor.fetchall()
+        return [self._row_to_article(row) for row in rows]
+    
     async def delete_old_articles(self, days: int = 30) -> int:
         """Delete articles older than specified days"""
         cursor = await self.db.conn.execute("""
@@ -171,8 +242,82 @@ class ArticleRepository:
         await self.db.conn.commit()
         return cursor.rowcount
     
+    async def update_article_content(
+        self,
+        article_id: int,
+        full_content: Optional[str],
+        fetch_status: str,
+        fetched_at: datetime,
+        fetch_error: Optional[str]
+    ) -> bool:
+        """Update article full content and fetch status"""
+        try:
+            cursor = await self.db.conn.execute("""
+                UPDATE articles 
+                SET full_content = ?,
+                    fetch_status = ?,
+                    fetched_at = ?,
+                    fetch_error = ?
+                WHERE id = ?
+            """, (
+                full_content,
+                fetch_status,
+                fetched_at.isoformat(),
+                fetch_error,
+                article_id
+            ))
+            
+            await self.db.conn.commit()
+            return cursor.rowcount > 0
+            
+        except Exception as e:
+            logger.error(f"Error updating article content: {e}")
+            raise
+    
+    async def update_article_analysis(
+        self,
+        article_id: int,
+        actual_published_at: Optional[str],
+        actual_source: Optional[str],
+        importance_score: float,
+        analysis_status: str,
+        analyzed_at: datetime
+    ) -> bool:
+        """Update article AI analysis results"""
+        try:
+            cursor = await self.db.conn.execute("""
+                UPDATE articles 
+                SET actual_published_at = ?,
+                    actual_source = ?,
+                    importance_score = ?,
+                    analysis_status = ?,
+                    analyzed_at = ?
+                WHERE id = ?
+            """, (
+                actual_published_at,
+                actual_source,
+                importance_score,
+                analysis_status,
+                analyzed_at.isoformat(),
+                article_id
+            ))
+            
+            await self.db.conn.commit()
+            return cursor.rowcount > 0
+            
+        except Exception as e:
+            logger.error(f"Error updating article analysis: {e}")
+            raise
+    
     def _row_to_article(self, row) -> Article:
         """Convert database row to Article model"""
+        # Helper function to safely get value from row
+        def safe_get(key, default=None):
+            try:
+                return row[key] if row[key] is not None else default
+            except (KeyError, IndexError):
+                return default
+        
         return Article(
             id=row['id'],
             title=row['title'],
@@ -181,7 +326,16 @@ class ArticleRepository:
             source=row['source'],
             keyword=row['keyword'],
             crawled_at=datetime.fromisoformat(row['crawled_at']),
-            published_at=datetime.fromisoformat(row['published_at']) if row['published_at'] else None
+            published_at=datetime.fromisoformat(row['published_at']) if row['published_at'] else None,
+            full_content=safe_get('full_content'),
+            fetch_status=safe_get('fetch_status', 'pending'),
+            fetched_at=datetime.fromisoformat(safe_get('fetched_at')) if safe_get('fetched_at') else None,
+            fetch_error=safe_get('fetch_error'),
+            actual_published_at=datetime.fromisoformat(safe_get('actual_published_at')) if safe_get('actual_published_at') else None,
+            actual_source=safe_get('actual_source'),
+            importance_score=safe_get('importance_score'),
+            analysis_status=safe_get('analysis_status', 'pending'),
+            analyzed_at=datetime.fromisoformat(safe_get('analyzed_at')) if safe_get('analyzed_at') else None
         )
 
 

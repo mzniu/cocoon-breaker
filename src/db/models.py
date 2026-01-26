@@ -17,13 +17,29 @@ class Article:
     keyword: str
     crawled_at: datetime
     published_at: Optional[datetime] = None
+    full_content: Optional[str] = None
+    fetch_status: str = 'pending'  # 'pending' | 'success' | 'failed' | 'no_content'
+    fetched_at: Optional[datetime] = None
+    fetch_error: Optional[str] = None
+    # AI analysis fields
+    actual_published_at: Optional[datetime] = None
+    actual_source: Optional[str] = None
+    importance_score: Optional[float] = None  # 0-100
+    analysis_status: str = 'pending'  # 'pending' | 'success' | 'failed'
+    analyzed_at: Optional[datetime] = None
     
     def __post_init__(self):
         """Ensure datetime objects"""
         if isinstance(self.crawled_at, str):
             self.crawled_at = datetime.fromisoformat(self.crawled_at)
-        if isinstance(self.published_at, str):
+        if isinstance(self.published_at, str) and self.published_at:
             self.published_at = datetime.fromisoformat(self.published_at)
+        if isinstance(self.fetched_at, str) and self.fetched_at:
+            self.fetched_at = datetime.fromisoformat(self.fetched_at)
+        if isinstance(self.actual_published_at, str) and self.actual_published_at:
+            self.actual_published_at = datetime.fromisoformat(self.actual_published_at)
+        if isinstance(self.analyzed_at, str) and self.analyzed_at:
+            self.analyzed_at = datetime.fromisoformat(self.analyzed_at)
 
 
 @dataclass
