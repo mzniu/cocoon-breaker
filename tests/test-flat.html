@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 信息差 - Cocoon Breaker</title>
+    <script>
+        // 定义5个吸引人的主题色系
+        const themes = [
+            {
+                name: 'purple-pink',
+                primary: '#7C3AED',
+                secondary: '#06B6D4',
+                accent: '#EC4899'
+            },
+            {
+                name: 'ocean-blue',
+                primary: '#0EA5E9',
+                secondary: '#06B6D4',
+                accent: '#8B5CF6'
+            },
+            {
+                name: 'crimson-red',
+                primary: '#DC2626',
+                secondary: '#EF4444',
+                accent: '#F97316'
+            },
+            {
+                name: 'sunset-orange',
+                primary: '#F97316',
+                secondary: '#EF4444',
+                accent: '#EC4899'
+            },
+            {
+                name: 'royal-indigo',
+                primary: '#6366F1',
+                secondary: '#8B5CF6',
+                accent: '#EC4899'
+            }
+        ];
+        
+        // 随机选择主题
+        const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+        
+        // 在页面加载前应用主题
+        document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.style.setProperty('--brand-primary', randomTheme.primary);
+            document.documentElement.style.setProperty('--brand-secondary', randomTheme.secondary);
+            document.documentElement.style.setProperty('--brand-accent', randomTheme.accent);
+            document.body.setAttribute('data-theme', randomTheme.name);
+        });
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        
+        :root {
+            /* 主题色系 - 由JavaScript随机选择（5种配色方案） */
+            --brand-primary: #7C3AED;  /* 动态设置：主色 */
+            --brand-secondary: #06B6D4; /* 动态设置：辅助色 */
+            --brand-accent: #EC4899;    /* 动态设置：强调色 */
+            
+            --bg-primary: #FFFFFF;
+            --bg-secondary: #F9FAFB;
+            --bg-tertiary: #F3F4F6;
+            
+            --text-primary: #111827;
+            --text-secondary: #424650;
+            --text-tertiary: #79808b;
+            
+            --border-light: #E5E7EB;
+            --border-medium: #D1D5DB;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            width: 1080px;
+            min-height: 1440px;
+            margin: 0 auto;
+            background: #FFFEF7;
+            background-image: 
+                linear-gradient(0deg, #F8F7F0 1px, transparent 1px),
+                linear-gradient(90deg, #F8F7F0 1px, transparent 1px);
+            background-size: 40px 40px;
+            font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        .page-wrapper {
+            padding: 20px 20px;
+        }
+        
+        /* 顶部品牌条 */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-accent) 100%);
+            margin-bottom: 20px;
+        }
+        
+        .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .brand-title {
+            font-size: 94px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            color: white;
+        }
+        
+        .brand-subtitle {
+            font-size: 22px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .date-badge {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 12px 20px;
+            text-align: right;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .date-main {
+            font-size: 42px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: white;
+            margin-bottom: 4px;
+        }
+        
+        .date-sub {
+            font-size: 26px;
+            font-weight: 800;
+            color: rgba(255, 255, 255, 0.85);
+        }
+        
+
+        /* 精选区域 */
+        .featured-section {
+            background: #FFFEF7;
+            background-image: radial-gradient(circle at 1px 1px, #F8F7F0 1px, transparent 1px);
+            background-size: 20px 20px;
+            border: 2px solid var(--brand-primary);
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .featured-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        
+        .featured-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        
+        .featured-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--brand-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        
+        .featured-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--brand-primary);
+            white-space: nowrap;
+        }
+        
+        .featured-content {
+            font-size: 20px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+                /* 精选区域内的关键字 */
+        .featured-keywords {
+            display: flex;
+            /* flex-direction: column; */
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        
+        .keyword-item {
+            padding: 4px 8px;
+            background: #FFFEF7;
+            background-image: radial-gradient(circle at 1px 1px, #F8F7F0 1px, transparent 1px);
+            background-size: 20px 20px;
+            border: 1.5px solid var(--border-light);
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        
+        /* 隐藏原关键字云 */
+        .keyword-cloud {
+            display: none;
+        }
+        
+        /* 新闻网格 */
+        .news-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .news-card {
+            background: #FFFEF7;
+            background-image: radial-gradient(circle at 1px 1px, #F8F7F0 1px, transparent 1px);
+            background-size: 20px 20px;
+            border: 1.5px solid var(--brand-primary);
+            padding: 16px;
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            gap: 12px;
+        }
+        
+        .card-index {
+            min-width: 44px;
+            height: 44px;
+            background: var(--brand-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 22px;
+            font-family: 'JetBrains Mono', monospace;
+            color: white;
+            flex-shrink: 0;
+        }
+        
+        .card-title-wrapper {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            flex: 1;
+        }
+        
+        .card-meta {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+        
+        .priority-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .priority-critical {
+            background: #EF4444;
+        }
+        
+        .priority-high {
+            background: #10B981;
+        }
+        
+        .priority-normal {
+            background: var(--brand-secondary);
+        }
+        
+        .source-badge {
+            padding: 4px 12px;
+            background: var(--bg-tertiary);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+        }
+        
+        .card-title {
+            font-size: 28px;
+            font-weight: 600;
+            line-height: 1.5;
+            margin-bottom: 0;
+            color: var(--text-primary);
+            text-align: left;
+        }
+        
+        .card-content {
+            font-size: 19px;
+            line-height: 1.7;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            text-align: left;
+        }
+        
+        /* 页脚 */
+        .footer {
+            margin-top: 12px;
+            padding: 8px;
+            text-align: center;
+            background: #FFFEF7;
+            background-image: radial-gradient(circle at 1px 1px, #F8F7F0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .footer-brand {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 6px;
+        }
+        
+        .footer-text {
+            font-size: 15px;
+            color: var(--text-tertiary);
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- 顶部品牌区 -->
+        <div class="top-bar">
+            <div class="brand">
+                <div class="brand-title">AI 信息差</div>
+                <div class="brand-subtitle">/ 打破信息茧房 | 消除 AI 焦虑 /</div>
+            </div>
+            <div class="date-badge">
+                <div class="date-main">2026.01.25</div>
+                <div class="date-sub">星期日</div>
+            </div>
+        </div>
+
+        <!-- 关键词云 -->
+        <div class="keyword-cloud">
+            <div class="keyword-item">量子计算突破</div>
+            <div class="keyword-item">AI芯片革命</div>
+            <div class="keyword-item">自动驾驶L5</div>
+            <div class="keyword-item">脑机接口商用</div>
+            <div class="keyword-item">元宇宙基建</div>
+        </div>
+
+        <!-- 今日精选 -->
+        <div class="featured-section">
+            <div class="featured-top">
+                <div class="featured-header">
+                    <div class="featured-icon">⚡</div>
+                    <div class="featured-title">今日必读</div>
+                    <div class="featured-keywords">
+                    <div class="keyword-item">量子计算突破</div>
+                    <div class="keyword-item">AI芯片革命</div>
+                    <div class="keyword-item">自动驾驶L5</div>
+                    <div class="keyword-item">脑机接口商用</div>
+                    <div class="keyword-item">元宇宙基建</div>
+                </div>
+                </div>
+                
+            </div>
+            <div class="featured-content">
+                今日AI科技领域三大突破：Google发布可室温运行的量子芯片Willow-X，错误率降低至0.001%；特斯拉FSD完全自动驾驶系统通过全球首个L5级认证；Neuralink脑机接口获FDA批准，首批商用设备开始量产。
+            </div>
+        </div>
+
+        <!-- 新闻网格 -->
+        <div class="news-grid">
+            <div class="news-card">
+                <div class="card-header">
+                    <div class="card-title-wrapper">
+                        <div class="card-index">01</div>
+                        <div class="card-title">Google Willow-X量子芯片实现室温运行，量子计算进入实用化时代</div>
+                    </div>
+                    <div class="card-meta">
+                        <div class="priority-dot priority-critical"></div>
+                        <div class="source-badge">NATURE</div>
+                    </div>
+                </div>
+                <div class="card-content">
+                    Google Quantum AI团队今日在Nature发表论文，宣布其最新量子芯片Willow-X在室温环境下稳定运行，错误率降低至0.001%，量子比特数达到1000个。研究团队采用全新的拓扑量子纠错架构和石墨烯基底材料，使得量子态可在25°C环境保持超过1小时。
+                </div>
+            </div>
+
+            <div class="news-card">
+                <div class="card-header">
+                    <div class="card-title-wrapper">
+                        <div class="card-index">02</div>
+                        <div class="card-title">特斯拉FSD获全球首个L5级自动驾驶认证</div>
+                    </div>
+                    <div class="card-meta">
+                        <div class="priority-dot priority-critical"></div>
+                        <div class="source-badge">TESLA</div>
+                    </div>
+                </div>
+                <div class="card-content">
+                    特斯拉全自动驾驶系统（FSD）今日通过联合国车辆法规协调论坛（WP.29）的L5级认证，成为全球首个获得完全自动驾驶许可的商用系统。新版FSD基于Dojo超算训练的视觉大模型，可在无地图、无GPS的极端条件下完成驾驶任务。
+                </div>
+            </div>
+
+            <div class="news-card">
+                <div class="card-header">
+                    <div class="card-title-wrapper">
+                        <div class="card-index">03</div>
+                        <div class="card-title">Neuralink脑机接口获FDA批准，首批1000套设备投产</div>
+                    </div>
+                    <div class="card-meta">
+                        <div class="priority-dot priority-critical"></div>
+                        <div class="source-badge">FDA</div>
+                    </div>
+                </div>
+                <div class="card-content">
+                    FDA今日宣布批准Neuralink脑机接口设备N1 Link的商业化销售，适应症包括渐冻症、脊髓损伤等神经系统疾病。该设备通过1024个电极阵列实时解码大脑信号，使患者能够用意念控制电子设备。
+                </div>
+            </div>
+
+            <div class="news-card">
+                <div class="card-header">
+                    <div class="card-title-wrapper">
+                        <div class="card-index">04</div>
+                        <div class="card-title">英伟达B200 Ultra GPU，AI训练速度提升10倍</div>
+                    </div>
+                    <div class="card-meta">
+                        <div class="priority-dot priority-high"></div>
+                        <div class="source-badge">NVIDIA</div>
+                    </div>
+                </div>
+                <div class="card-content">
+                    英伟达在GTC 2026大会上发布新一代AI芯片B200 Ultra，采用2nm工艺，集成5000亿晶体管。相比上代H100，训练速度提升10倍，推理速度提升15倍，功耗降低70%。
+                </div>
+            </div>
+
+            <div class="news-card">
+                <div class="card-header">
+                    <div class="card-title-wrapper">
+                        <div class="card-index">05</div>
+                        <div class="card-title">GPT-5发布：首个通过图灵测试的AI</div>
+                    </div>
+                    <div class="card-meta">
+                        <div class="priority-dot priority-high"></div>
+                        <div class="source-badge">OPENAI</div>
+                    </div>
+                </div>
+                <div class="card-content">
+                    OpenAI正式发布GPT-5，这是首个在严格图灵测试中无法被人类区分的AI系统。新模型参数达10万亿，采用全新的神经符号混合架构，在数学、物理、编程等领域达到博士研究生水平。
+                </div>
+            </div>
+
+            <div class="news-card">
+                <div class="card-header">
+                    <div class="card-title-wrapper">
+                        <div class="card-index">06</div>
+                        <div class="card-title">Meta Quest Pro 3，首款真正意义的AR/VR融合头显</div>
+                    </div>
+                    <div class="card-meta">
+                        <div class="priority-dot priority-high"></div>
+                        <div class="source-badge">META</div>
+                    </div>
+                </div>
+                <div class="card-content">
+                    Meta发布Quest Pro 3头显，重量仅280克，续航8小时，支持4K分辨率和120Hz刷新率。突破性的视网膜投影技术，可在真实世界叠加虚拟物体，视场角达到120度。
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <div class="footer">
+            <div class="footer-brand">@小牛聊AI · COCOON BREAKER</div>
+        </div>
+    </div>
+</body>
+</html>
