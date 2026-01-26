@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文章浏览 - Cocoon Breaker</title>
-    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <!-- 使用本地 Vue 文件 -->
+    <script src="/static/js/vue.global.prod.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
         body {
@@ -178,7 +179,7 @@
         }
         
         .expand-btn {
-            color: #007bff;
+            color: #667eea;
             cursor: pointer;
             font-size: 0.9em;
             margin-top: 8px;
@@ -188,6 +189,69 @@
         
         .expand-btn:hover {
             text-decoration: underline;
+            color: #764ba2;
+        }
+
+        .article-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .btn-fetch {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-fetch:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-fetch:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-view-full {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-view-full:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .fetch-error {
+            color: #f5576c;
+            font-size: 0.85em;
+            display: inline-block;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .full-content {
+            border-left: 4px solid #667eea;
+            padding-left: 16px;
+            margin-top: 16px;
+        }
+
+        .full-content-header {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 12px;
+            font-size: 1.1em;
         }
 
         .badge {
@@ -219,8 +283,17 @@
             background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
         }
         
+        /* Fallback for old data with 36kr source */
+        .badge-36kr {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+        }
+        
         .badge-huxiu {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .badge-toutiao {
+            background: linear-gradient(135deg, #ff4757 0%, #ff6348 100%);
         }
 
         .badge-keyword {
@@ -238,6 +311,38 @@
         
         .badge-score-low {
             background: linear-gradient(135deg, #757575 0%, #9e9e9e 100%);
+        }
+        
+        /* AI 分析相关样式 */
+        .badge-importance {
+            font-weight: bold;
+            padding: 3px 10px;
+        }
+        
+        .badge-importance-high {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
+        .badge-importance-medium {
+            background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%);
+        }
+        
+        .badge-importance-low {
+            background: linear-gradient(135deg, #757575 0%, #9e9e9e 100%);
+        }
+        
+        .badge-source {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .badge-pending {
+            background: linear-gradient(135deg, #bdbdbd 0%, #9e9e9e 100%);
+            opacity: 0.7;
+        }
+        
+        .badge-failed {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            opacity: 0.6;
         }
         
         .keyword-highlight {
@@ -498,6 +603,7 @@
                             <option value="tavily">Tavily</option>
                             <option value="kr36">36氪</option>
                             <option value="huxiu">虎嗅</option>
+                            <option value="toutiao">头条</option>
                         </select>
                     </div>
                     
@@ -545,6 +651,9 @@
                     <button @click="resetFilters" class="btn btn-secondary">
                         🔄 重置筛选
                     </button>
+                    <button @click="batchAnalyzeArticles" class="btn btn-primary" :disabled="analyzing">
+                        {{ analyzing ? '🔄 分析中...' : '🤖 批量AI分析' }}
+                    </button>
                     <button @click="cleanupOldArticles" class="btn btn-danger">
                         🗑️ 清理旧文章
                     </button>
@@ -584,6 +693,50 @@
                         <span v-if="article.score !== undefined" class="badge" :class="getScoreBadgeClass(article.score)">
                             ⭐ {{ article.score.toFixed(2) }}
                         </span>
+                        
+                        <!-- AI 分析：重要性评分 -->
+                        <span 
+                            v-if="article.importance_score !== null && article.importance_score !== undefined"
+                            class="badge badge-importance"
+                            :class="getImportanceBadgeClass(article.importance_score)"
+                            :title="'AI 评定重要性：' + article.importance_score + ' 分'"
+                        >
+                            🎯 {{ article.importance_score.toFixed(0) }}分
+                        </span>
+                        
+                        <!-- AI 分析：真实来源 -->
+                        <span 
+                            v-if="article.actual_source && article.analysis_status === 'success'"
+                            class="badge badge-source"
+                            :title="'AI 识别的真实来源'"
+                        >
+                            📰 {{ article.actual_source }}
+                        </span>
+                        
+                        <!-- AI 分析：真实发布时间 -->
+                        <span 
+                            v-if="article.actual_published_at && article.analysis_status === 'success'"
+                            :title="'AI 识别的真实发布时间'"
+                        >
+                            📅 {{ formatTime(article.actual_published_at) }}
+                        </span>
+                        
+                        <!-- 分析状态提示 -->
+                        <span 
+                            v-if="article.analysis_status === 'pending'"
+                            class="badge badge-pending"
+                            title="AI 分析待处理"
+                        >
+                            ⏳ 分析中
+                        </span>
+                        <span 
+                            v-else-if="article.analysis_status === 'failed'"
+                            class="badge badge-failed"
+                            title="AI 分析失败"
+                        >
+                            ⚠️ 分析失败
+                        </span>
+                        
                         <span>
                             🕐 {{ formatTime(article.crawled_at) }}
                         </span>
@@ -593,14 +746,53 @@
                     </div>
 
                     <div class="article-content">
-                        <div v-html="highlightKeyword(article.expanded ? article.content : getPreviewContent(article.content))"></div>
-                        <span 
-                            v-if="article.content && article.content.length > 200"
-                            @click="toggleExpand(article)"
-                            class="expand-btn"
-                        >
-                            {{ article.expanded ? '▲ 收起' : '▼ 展开全文' }}
-                        </span>
+                        <!-- 原始摘要或完整内容 -->
+                        <div v-if="!article.showFullContent" v-html="highlightKeyword(article.expanded ? article.content : getPreviewContent(article.content))"></div>
+                        
+                        <!-- 完整抓取的内容 -->
+                        <div v-if="article.showFullContent && article.full_content" class="full-content">
+                            <div class="full-content-header">📄 完整内容</div>
+                            <div v-html="highlightKeyword(article.full_content)"></div>
+                        </div>
+                        
+                        <!-- 操作按钮 -->
+                        <div class="article-actions">
+                            <!-- 展开/收起摘要 -->
+                            <span 
+                                v-if="article.content && article.content.length > 200 && !article.showFullContent"
+                                @click="toggleExpand(article)"
+                                class="expand-btn"
+                            >
+                                {{ article.expanded ? '▲ 收起' : '▼ 展开摘要' }}
+                            </span>
+                            
+                            <!-- 抓取完整内容按钮 -->
+                            <button
+                                v-if="!article.full_content || article.fetch_status === 'failed'"
+                                @click="fetchFullContent(article)"
+                                :disabled="article.fetching"
+                                class="btn btn-sm btn-fetch"
+                                :title="article.fetch_status === 'failed' ? '上次抓取失败，点击重试' : '抓取完整内容'"
+                            >
+                                <span v-if="article.fetching">⏳ 抓取中...</span>
+                                <span v-else-if="article.fetch_status === 'failed'">🔄 重新抓取</span>
+                                <span v-else>📥 抓取完整内容</span>
+                            </button>
+                            
+                            <!-- 查看完整内容按钮 -->
+                            <button
+                                v-if="article.full_content && article.fetch_status === 'success'"
+                                @click="toggleFullContent(article)"
+                                class="btn btn-sm btn-view-full"
+                            >
+                                {{ article.showFullContent ? '📄 查看摘要' : '📖 查看完整内容' }}
+                            </button>
+                            
+                            <!-- 抓取状态提示 -->
+                            <span v-if="article.fetch_error" class="fetch-error" :title="article.fetch_error">
+                                ⚠️ {{ article.fetch_error.substring(0, 50) }}{{ article.fetch_error.length > 50 ? '...' : '' }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -709,6 +901,7 @@
             data() {
                 return {
                     loading: false,
+                    analyzing: false,
                     articles: [],
                     total: 0,
                     filters: {
@@ -733,7 +926,8 @@
                         { label: '🔴 Google', source: 'google' },
                         { label: '🟢 Tavily', source: 'tavily' },
                         { label: '🟠 36氪', source: 'kr36' },
-                        { label: '🟡 虎嗅', source: 'huxiu' }
+                        { label: '� 头条', source: 'toutiao' },
+                        { label: '�🟡 虎嗅', source: 'huxiu' }
                     ]
                 };
             },
@@ -854,10 +1048,12 @@
                         const data = await response.json();
 
                         if (response.ok) {
-                            // 添加expanded属性
+                            // 添加UI状态属性
                             this.articles = data.items.map(article => ({
                                 ...article,
-                                expanded: false
+                                expanded: false,
+                                showFullContent: false,
+                                fetching: false
                             }));
                             this.total = data.total;
                             
@@ -956,7 +1152,9 @@
                         'google': 'Google',
                         'tavily': 'Tavily',
                         'kr36': '36氪',
-                        'huxiu': '虎嗅'
+                        '36kr': '36氪',  // Fallback for old data
+                        'huxiu': '虎嗅',
+                        'toutiao': '头条'
                     };
                     return sourceMap[source] || source;
                 },
@@ -965,6 +1163,15 @@
                     if (score >= 0.7) return 'badge-score-high';
                     if (score >= 0.4) return 'badge-score-medium';
                     return 'badge-score-low';
+                },
+                
+                getImportanceBadgeClass(score) {
+                    // 80-100: 高重要性（绿色）
+                    // 40-79: 中等重要性（黄色）
+                    // 0-39: 低重要性（灰色）
+                    if (score >= 80) return 'badge-importance-high';
+                    if (score >= 40) return 'badge-importance-medium';
+                    return 'badge-importance-low';
                 },
                 
                 sortArticles() {
@@ -1006,6 +1213,51 @@
                     article.expanded = !article.expanded;
                 },
                 
+                toggleFullContent(article) {
+                    article.showFullContent = !article.showFullContent;
+                },
+                
+                async fetchFullContent(article) {
+                    if (article.fetching) return;
+                    
+                    article.fetching = true;
+                    article.fetch_error = null;
+                    
+                    try {
+                        const response = await fetch(`/api/articles/${article.id}/fetch-content`, {
+                            method: 'POST'
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            // Update article with fetched content
+                            const updatedArticle = data.article;
+                            article.full_content = updatedArticle.full_content;
+                            article.fetch_status = updatedArticle.fetch_status;
+                            article.fetched_at = updatedArticle.fetched_at;
+                            article.fetch_error = updatedArticle.fetch_error;
+                            
+                            if (article.fetch_status === 'success') {
+                                // Automatically show full content after successful fetch
+                                article.showFullContent = true;
+                                alert('✅ 完整内容抓取成功！');
+                            } else if (article.fetch_status === 'no_content') {
+                                alert('⚠️ 无法提取内容：' + (article.fetch_error || '内容太短或格式不支持'));
+                            } else {
+                                alert('❌ 抓取失败：' + (article.fetch_error || '未知错误'));
+                            }
+                        } else {
+                            alert('抓取失败: ' + (data.detail || '未知错误'));
+                        }
+                    } catch (error) {
+                        console.error('Error fetching content:', error);
+                        alert('抓取失败: ' + error.message);
+                    } finally {
+                        article.fetching = false;
+                    }
+                },
+                
                 applyQuickFilter(qf) {
                     if (qf.hours) {
                         // 时间快捷筛选
@@ -1040,6 +1292,38 @@
                     // Esc 清空筛选
                     if (e.key === 'Escape') {
                         this.resetFilters();
+                    }
+                },
+                
+                // === 批量AI分析 ===
+                async batchAnalyzeArticles() {
+                    if (this.analyzing) return;
+                    
+                    if (!confirm('将批量分析所有未分析的文章（最多500篇），这可能需要较长时间。是否继续？')) {
+                        return;
+                    }
+                    
+                    this.analyzing = true;
+                    
+                    try {
+                        const response = await fetch('/api/articles/batch-analyze?status_filter=pending&limit=500', {
+                            method: 'POST'
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            alert(`✅ 批量分析完成！\n\n总计: ${data.total}\n成功: ${data.success}\n失败: ${data.failed}\n跳过: ${data.skipped}\n\n${data.message}`);
+                            // 重新加载文章以显示更新后的分析结果
+                            await this.loadArticles();
+                        } else {
+                            alert(`❌ 批量分析失败: ${data.detail || '未知错误'}`);
+                        }
+                    } catch (error) {
+                        console.error('Error batch analyzing articles:', error);
+                        alert('❌ 批量分析失败: ' + error.message);
+                    } finally {
+                        this.analyzing = false;
                     }
                 },
                 
