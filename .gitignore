@@ -50,3 +50,4 @@ Thumbs.db
 htmlcov/
 *.cover
 .github/
+.shared/
