@@ -9,18 +9,31 @@ createApp({
                 time: '08:00',
                 enabled: true
             },
-            showAddDialog: false,
+            crawlSchedule: {
+                enabled: true,
+                times: ['06:00', '12:00', '18:00', '22:00']
+            },
+            showSubscriptionModal: false,
+            showSettingsModal: false,
             newKeyword: '',
             generating: false,
+            generatingOnly: false,
             collecting: false,
             viewingReport: null,
             notification: null,
             // Log panel
             logs: [],
-            logCollapsed: false,
+            showLogPanel: false,
+            logPanelWidth: 400,
+            isResizing: false,
             autoScroll: true,
             logPollingInterval: null,
-            lastLogTimestamp: null
+            lastLogTimestamp: null,
+            // Background tasks
+            activeTasks: [],  // List of active task IDs being polled
+            taskPollingIntervals: {},  // task_id -> interval
+            currentTask: null,  // Currently displayed task progress
+            showTaskDialog: false
         };
     },
     
@@ -29,9 +42,14 @@ createApp({
         this.loadSubscriptions();
         this.loadReports();
         this.loadSchedule();
+        this.loadCrawlSchedule();
         
         // Start log polling (every 5 seconds)
         this.startLogPolling();
+        
+        // Add global mouse event listeners for resizing
+        document.addEventListener('mousemove', this.handleResize);
+        document.addEventListener('mouseup', this.stopResize);
     },
     
     beforeUnmount() {
@@ -39,9 +57,34 @@ createApp({
         if (this.logPollingInterval) {
             clearInterval(this.logPollingInterval);
         }
+        // Clean up resize listeners
+        document.removeEventListener('mousemove', this.handleResize);
+        document.removeEventListener('mouseup', this.stopResize);
     },
     
     methods: {
+        // Log Panel functions
+        toggleLogPanel() {
+            this.showLogPanel = !this.showLogPanel;
+        },
+        
+        startResize(e) {
+            this.isResizing = true;
+            e.preventDefault();
+        },
+        
+        handleResize(e) {
+            if (!this.isResizing) return;
+            const newWidth = window.innerWidth - e.clientX;
+            if (newWidth >= 280 && newWidth <= 600) {
+                this.logPanelWidth = newWidth;
+            }
+        },
+        
+        stopResize() {
+            this.isResizing = false;
+        },
+        
         // Log functions
         addLog(level, message) {
             const time = new Date().toLocaleTimeString('zh-CN', { 
@@ -223,15 +266,22 @@ createApp({
             this.collecting = true;
             try {
                 this.addLog('info', '🚀 开始搜集资讯...');
-                this.addLog('info', '步骤 1/2: 获取启用的订阅');
                 
-                await axios.post('/api/reports/collect-articles', {});
+                const response = await axios.post('/api/reports/collect-articles', {});
                 
-                this.addLog('info', '步骤 2/2: 爬取文章数据');
-                this.addLog('success', '✅ 资讯搜集已启动，请稍后查看文章列表');
-                this.showNotification('资讯搜集已启动', 'success');
+                if (response.data.task_id) {
+                    // New background task mode
+                    const taskId = response.data.task_id;
+                    this.addLog('info', `任务已提交 (ID: ${taskId.substring(0, 8)}...)`);
+                    this.startTaskPolling(taskId, 'collect');
+                    this.showNotification('资讯搜集已启动，正在后台运行...', 'success');
+                } else {
+                    // Legacy sync mode
+                    this.addLog('success', '✅ 资讯搜集完成');
+                    this.showNotification('资讯搜集完成', 'success');
+                }
             } catch (error) {
-                this.addLog('error', '搜集资讯失败: ' + error.message);
+                this.addLog('error', '搜集资讯失败: ' + (error.response?.data?.detail || error.message));
                 this.showNotification('搜集资讯失败', 'error');
                 console.error('Collect articles error:', error);
             } finally {
@@ -244,24 +294,149 @@ createApp({
             
             try {
                 this.addLog('info', '🚀 开始生成日报...');
-                this.addLog('info', '步骤 1/4: 获取启用的订阅');
-                await axios.post('/api/reports/generate', {});
-                this.addLog('info', '步骤 2/4: 爬取文章数据');
-                this.addLog('info', '步骤 3/4: AI 筛选与摘要');
-                this.addLog('info', '步骤 4/4: 生成 HTML 日报');
-                this.addLog('success', '✅ 日报生成已启动，请稍后查看结果');
-                this.showNotification('日报生成已启动，请稍后刷新查看', 'success');
                 
-                // Reload reports after a delay
-                setTimeout(() => {
+                const response = await axios.post('/api/reports/generate', {});
+                
+                if (response.data.task_id) {
+                    // New background task mode
+                    const taskId = response.data.task_id;
+                    this.addLog('info', `任务已提交 (ID: ${taskId.substring(0, 8)}...)`);
+                    this.startTaskPolling(taskId, 'generate');
+                    this.showNotification('日报生成已启动，正在后台运行...', 'success');
+                } else {
+                    // Legacy sync mode
+                    this.addLog('success', '✅ 日报生成完成');
+                    this.showNotification('日报生成完成', 'success');
                     this.loadReports();
-                }, 3000);
+                }
             } catch (error) {
                 this.addLog('error', '❌ 生成日报失败: ' + (error.response?.data?.detail || error.message));
                 this.showNotification('生成日报失败', 'error');
                 console.error('Generate report error:', error);
             } finally {
                 this.generating = false;
+            }
+        },
+        
+        async generateReportOnly() {
+            this.generatingOnly = true;
+            
+            try {
+                this.addLog('info', '📄 基于现有文章生成日报...');
+                
+                const response = await axios.post('/api/reports/generate-only', {});
+                
+                if (response.data.task_id) {
+                    // New background task mode
+                    const taskId = response.data.task_id;
+                    this.addLog('info', `仅生成报告任务已提交 (ID: ${taskId.substring(0, 8)}...)`);
+                    this.startTaskPolling(taskId, 'generate-only');
+                    this.showNotification('仅生成日报已启动（基于现有文章）', 'success');
+                } else {
+                    // Legacy sync mode
+                    this.addLog('success', '✅ 日报生成完成');
+                    this.showNotification('日报生成完成', 'success');
+                    this.loadReports();
+                }
+            } catch (error) {
+                this.addLog('error', '❌ 生成日报失败: ' + (error.response?.data?.detail || error.message));
+                this.showNotification('生成日报失败', 'error');
+                console.error('Generate report only error:', error);
+            } finally {
+                this.generatingOnly = false;
+            }
+        },
+        
+        // Task polling methods
+        startTaskPolling(taskId, taskType) {
+            this.activeTasks.push({ id: taskId, type: taskType, progress: 0, status: 'running', logs: [] });
+            this.showTaskDialog = true;
+            this.currentTask = this.activeTasks.find(t => t.id === taskId);
+            
+            // Poll every 2 seconds
+            const interval = setInterval(async () => {
+                await this.pollTaskStatus(taskId);
+            }, 2000);
+            
+            this.taskPollingIntervals[taskId] = interval;
+            
+            // Initial poll
+            this.pollTaskStatus(taskId);
+        },
+        
+        async pollTaskStatus(taskId) {
+            try {
+                const response = await axios.get(`/api/tasks/${taskId}`);
+                const task = response.data;
+                
+                // Update active task
+                const activeTask = this.activeTasks.find(t => t.id === taskId);
+                if (activeTask) {
+                    activeTask.progress = task.progress || 0;
+                    activeTask.status = task.status;
+                    activeTask.message = task.message;
+                    activeTask.logs = task.logs || [];
+                    
+                    // Add new logs to main log panel
+                    if (task.logs && task.logs.length > 0) {
+                        const lastLogIndex = activeTask.lastLogIndex || 0;
+                        for (let i = lastLogIndex; i < task.logs.length; i++) {
+                            this.addLog('info', task.logs[i]);
+                        }
+                        activeTask.lastLogIndex = task.logs.length;
+                    }
+                }
+                
+                // Check if task is complete
+                if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
+                    this.stopTaskPolling(taskId);
+                    
+                    if (task.status === 'completed') {
+                        this.addLog('success', `✅ 任务完成: ${task.message || '成功'}`);
+                        this.showNotification('任务完成', 'success');
+                        
+                        // Reload reports if it was a generate task
+                        if (activeTask && (activeTask.type === 'generate' || activeTask.type === 'generate-only' || activeTask.type === 'full-pipeline')) {
+                            setTimeout(() => this.loadReports(), 1000);
+                        }
+                    } else if (task.status === 'failed') {
+                        this.addLog('error', `❌ 任务失败: ${task.error || '未知错误'}`);
+                        this.showNotification('任务失败: ' + (task.error || '未知错误'), 'error');
+                    } else {
+                        this.addLog('warning', '任务已取消');
+                        this.showNotification('任务已取消', 'warning');
+                    }
+                    
+                    // Remove from active tasks after a delay
+                    setTimeout(() => {
+                        const index = this.activeTasks.findIndex(t => t.id === taskId);
+                        if (index > -1) {
+                            this.activeTasks.splice(index, 1);
+                        }
+                        if (this.activeTasks.length === 0) {
+                            this.showTaskDialog = false;
+                        }
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('Poll task status error:', error);
+                // Don't stop polling on temporary errors
+            }
+        },
+        
+        stopTaskPolling(taskId) {
+            if (this.taskPollingIntervals[taskId]) {
+                clearInterval(this.taskPollingIntervals[taskId]);
+                delete this.taskPollingIntervals[taskId];
+            }
+        },
+        
+        async cancelTask(taskId) {
+            try {
+                await axios.delete(`/api/tasks/${taskId}`);
+                this.addLog('warning', '任务取消请求已发送');
+            } catch (error) {
+                this.addLog('error', '取消任务失败: ' + error.message);
             }
         },
         
@@ -371,10 +546,54 @@ createApp({
         async updateSchedule() {
             try {
                 await axios.put('/api/schedule', this.schedule);
-                this.showNotification('定时配置已更新', 'success');
+                this.showNotification('日报生成定时配置已更新', 'success');
             } catch (error) {
                 this.showNotification('更新定时配置失败', 'error');
                 console.error('Update schedule error:', error);
+            }
+        },
+        
+        // Crawl Schedule
+        async loadCrawlSchedule() {
+            try {
+                const response = await axios.get('/api/schedule/crawl');
+                this.crawlSchedule = {
+                    enabled: response.data.enabled,
+                    times: response.data.times || ['06:00', '12:00', '18:00', '22:00']
+                };
+            } catch (error) {
+                console.error('Load crawl schedule error:', error);
+                // Use default if API fails
+                this.crawlSchedule = {
+                    enabled: true,
+                    times: ['06:00', '12:00', '18:00', '22:00']
+                };
+            }
+        },
+        
+        async updateCrawlSchedule() {
+            try {
+                await axios.put('/api/schedule/crawl', this.crawlSchedule);
+                this.showNotification('资讯采集定时配置已更新', 'success');
+            } catch (error) {
+                this.showNotification('更新采集定时配置失败', 'error');
+                console.error('Update crawl schedule error:', error);
+            }
+        },
+        
+        addCrawlTime() {
+            // Add a new time slot, default to next hour
+            const lastTime = this.crawlSchedule.times[this.crawlSchedule.times.length - 1] || '12:00';
+            const [hour, min] = lastTime.split(':').map(Number);
+            const newHour = (hour + 4) % 24;  // Add 4 hours
+            const newTime = `${String(newHour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+            this.crawlSchedule.times.push(newTime);
+        },
+        
+        removeCrawlTime(index) {
+            if (this.crawlSchedule.times.length > 1) {
+                this.crawlSchedule.times.splice(index, 1);
+                this.updateCrawlSchedule();
             }
         },
         

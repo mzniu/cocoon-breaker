@@ -18,7 +18,8 @@ from src.db.repository import (
     ArticleRepository,
     SubscriptionRepository,
     ReportRepository,
-    ScheduleRepository
+    ScheduleRepository,
+    CrawlScheduleRepository
 )
 from src.db.models import Article, Report
 from src.ai.deepseek import DeepseekClient
@@ -43,6 +44,7 @@ class DailyReportTask:
         self.subscription_repo = None
         self.report_repo = None
         self.schedule_repo = None
+        self.crawl_schedule_repo = None
         
         # Task running flag
         self._running = False
@@ -58,6 +60,7 @@ class DailyReportTask:
         self.subscription_repo = SubscriptionRepository(self.db)
         self.report_repo = ReportRepository(self.db)
         self.schedule_repo = ScheduleRepository(self.db)
+        self.crawl_schedule_repo = CrawlScheduleRepository(self.db)
         
         # Deepseek client
         self.deepseek_client = DeepseekClient(
@@ -168,8 +171,13 @@ class DailyReportTask:
             await self.db.close()
         logger.info("DailyReportTask cleaned up")
     
-    async def run(self):
-        """Execute daily report generation"""
+    async def run(self, keyword: str = None):
+        """Execute daily report generation
+        
+        Args:
+            keyword: Optional specific keyword to generate report for.
+                     If None, generates reports for all enabled subscriptions.
+        """
         if self._running:
             logger.warning("Task already running, skipping")
             return
@@ -177,24 +185,33 @@ class DailyReportTask:
         self._running = True
         
         try:
-            logger.info("Starting daily report generation")
+            logger.info(f"Starting daily report generation (keyword={keyword})")
             
-            # Get enabled subscriptions
-            subscriptions = await self.subscription_repo.get_enabled()
-            
-            if not subscriptions:
-                logger.info("No enabled subscriptions, skipping")
-                return
-            
-            logger.info(f"Found {len(subscriptions)} enabled subscriptions")
-            
-            # Process each subscription
-            for subscription in subscriptions:
+            # Get subscriptions to process
+            if keyword:
+                # Process specific keyword
+                logger.info(f"Processing single keyword: {keyword}")
                 try:
-                    await self._process_subscription(subscription.keyword)
+                    await self._process_subscription(keyword)
                 except Exception as e:
-                    logger.error(f"Failed to process subscription {subscription.keyword}: {e}")
-                    continue
+                    logger.error(f"Failed to process subscription {keyword}: {e}")
+            else:
+                # Get enabled subscriptions
+                subscriptions = await self.subscription_repo.get_enabled()
+                
+                if not subscriptions:
+                    logger.info("No enabled subscriptions, skipping")
+                    return
+                
+                logger.info(f"Found {len(subscriptions)} enabled subscriptions")
+                
+                # Process each subscription
+                for subscription in subscriptions:
+                    try:
+                        await self._process_subscription(subscription.keyword)
+                    except Exception as e:
+                        logger.error(f"Failed to process subscription {subscription.keyword}: {e}")
+                        continue
             
             logger.info("Daily report generation completed")
             
@@ -238,27 +255,80 @@ class DailyReportTask:
             return
         
         # Step 4: Generate report
-        report_path = self.report_generator.generate_report(
+        report_result = self.report_generator.generate_report(
             keyword,
             recent_articles
         )
         
-        if report_path:
-            # Step 5: Save report record
+        if report_result and report_result.get('html_content'):
+            # Step 5: Save report record to database (no file output)
+            import json
+            
             report = Report(
                 id=None,
                 keyword=keyword,
-                date=datetime.now().date(),
-                file_path=report_path,
-                article_count=len(recent_articles),
-                generated_at=datetime.now()
+                date=str(datetime.now().date()),
+                file_path="",  # No longer saving to file
+                article_count=report_result.get('article_count', len(recent_articles)),
+                generated_at=datetime.now(),
+                html_content=report_result.get('html_content'),
+                summary=report_result.get('summary'),
+                article_ids=json.dumps(report_result.get('article_ids', []))
             )
             
-            await self.report_repo.create(report)
-            logger.info(f"Report generated: {report_path}")
+            report_id = await self.report_repo.create(report)
+            logger.info(f"Report generated and saved to database (ID={report_id})")
         else:
             logger.error(f"Failed to generate report for {keyword}")
-    
+
+    async def collect_articles(self):
+        """Collect articles for all enabled subscriptions (without generating reports)"""
+        if self._running:
+            logger.warning("Task already running, skipping article collection")
+            return
+        
+        self._running = True
+        
+        try:
+            logger.info("Starting scheduled article collection...")
+            
+            # Get enabled subscriptions
+            subscriptions = await self.subscription_repo.get_enabled()
+            
+            if not subscriptions:
+                logger.info("No enabled subscriptions for article collection")
+                return
+            
+            logger.info(f"Collecting articles for {len(subscriptions)} subscriptions")
+            
+            # Process each subscription (crawl and save only)
+            total_saved = 0
+            for subscription in subscriptions:
+                try:
+                    keyword = subscription.keyword
+                    logger.info(f"Collecting articles for: {keyword}")
+                    
+                    # Crawl articles
+                    articles = await self._crawl_articles(keyword)
+                    
+                    if not articles:
+                        logger.warning(f"No articles found for {keyword}")
+                        continue
+                    
+                    # Save to database (with deduplication)
+                    saved_count = await self._save_articles(articles)
+                    total_saved += saved_count
+                    logger.info(f"Saved {saved_count}/{len(articles)} articles for {keyword}")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to collect articles for {subscription.keyword}: {e}")
+                    continue
+            
+            logger.info(f"Article collection completed. Total saved: {total_saved}")
+            
+        finally:
+            self._running = False
+
     async def _crawl_articles(self, keyword: str) -> List[Article]:
         """Crawl articles from all sources"""
         all_articles = []
@@ -351,21 +421,35 @@ class TaskScheduler:
         # Initialize task
         await self.task.initialize()
         
-        # Get schedule config
+        # Get schedule config for report generation
         config = get_config()
-        schedule_config = await self.task.schedule_repo.get()
+        schedule_config = await self.task.schedule_repo.get_config()
         
-        if not schedule_config or not schedule_config.enabled:
-            logger.info("Scheduler is disabled")
-            return
+        # Schedule report generation task
+        if schedule_config and schedule_config.enabled:
+            schedule_time = schedule_config.time
+            logger.info(f"Scheduling daily report generation at {schedule_time}")
+            
+            schedule.every().day.at(schedule_time).do(
+                lambda: asyncio.run(self.task.run())
+            )
+        else:
+            logger.info("Report generation scheduler is disabled")
         
-        # Schedule task
-        schedule_time = schedule_config.time
-        logger.info(f"Scheduling daily report at {schedule_time}")
+        # Get crawl schedule config for article collection
+        crawl_config = await self.task.crawl_schedule_repo.get_config()
         
-        schedule.every().day.at(schedule_time).do(
-            lambda: asyncio.run(self.task.run())
-        )
+        # Schedule article collection tasks
+        if crawl_config and crawl_config.enabled:
+            logger.info(f"Scheduling article collection at {crawl_config.times}")
+            
+            for crawl_time in crawl_config.times:
+                schedule.every().day.at(crawl_time).do(
+                    lambda: asyncio.run(self.task.collect_articles())
+                )
+                logger.info(f"  - Article collection scheduled at {crawl_time}")
+        else:
+            logger.info("Article collection scheduler is disabled")
         
         # Start scheduler thread (non-daemon for proper cleanup)
         self.scheduler_thread = threading.Thread(
@@ -415,15 +499,20 @@ class TaskScheduler:
         
         logger.info("Scheduler loop stopped")
     
-    async def run_once(self):
-        """Run task once immediately (for manual trigger)"""
-        logger.info("Running task once")
+    async def run_once(self, keyword: str = None):
+        """Run task once immediately (for manual trigger)
+        
+        Args:
+            keyword: Optional specific keyword to generate report for.
+                     If None, generates reports for all enabled subscriptions.
+        """
+        logger.info(f"Running task once (keyword={keyword})")
         
         # Initialize if not already initialized
         if self.task.db is None:
             await self.task.initialize()
         
-        await self.task.run()
+        await self.task.run(keyword=keyword)
     
     async def collect_articles_only(self):
         """Collect articles only without generating reports (for manual trigger)"""
@@ -468,13 +557,19 @@ class TaskScheduler:
 
 # Global scheduler instance
 _scheduler_instance = None
+_scheduler_initialized = False
 
 
 async def get_scheduler() -> TaskScheduler:
     """Get global scheduler instance"""
-    global _scheduler_instance
+    global _scheduler_instance, _scheduler_initialized
     
     if _scheduler_instance is None:
         _scheduler_instance = TaskScheduler()
+    
+    # Ensure task is initialized
+    if not _scheduler_initialized:
+        await _scheduler_instance.task.initialize()
+        _scheduler_initialized = True
     
     return _scheduler_instance

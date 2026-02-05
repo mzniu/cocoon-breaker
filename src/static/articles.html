@@ -6,34 +6,21 @@
     <title>文章浏览 - Cocoon Breaker</title>
     <!-- 使用本地 Vue 文件 -->
     <script src="/static/js/vue.global.prod.js"></script>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=7">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding-top: 80px;
+            padding-left: 20px;
+            padding-right: 20px;
+            padding-bottom: 20px;
         }
 
         .articles-container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0;
-        }
-
-        .header {
-            text-align: center;
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 0;
-            margin-bottom: 40px;
-        }
-
-        .header h1 {
-            font-size: 2rem;
-            margin: 0;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .filters {
@@ -561,12 +548,27 @@
 </head>
 <body>
     <div id="app">
-        <div class="articles-container">
-            <div class="header">
-                <h1>📚 文章浏览</h1>
-                <a href="/" class="back-link">← 返回首页</a>
+        <!-- Navigation Bar -->
+        <nav class="navbar">
+            <div class="navbar-container">
+                <div class="navbar-brand">
+                    <img src="/static/images/logo.svg" alt="Cocoon Breaker" class="navbar-logo">
+                    <span class="navbar-title">Cocoon Breaker</span>
+                </div>
+                <div class="navbar-menu">
+                    <a href="/" class="navbar-item">
+                        <span class="navbar-icon">🏠</span>
+                        <span>首页</span>
+                    </a>
+                    <a href="/articles.html" class="navbar-item active">
+                        <span class="navbar-icon">📚</span>
+                        <span>浏览文章</span>
+                    </a>
+                </div>
             </div>
+        </nav>
 
+        <div class="articles-container">
             <!-- Filters -->
             <div class="filters">
                 <!-- Quick Filters -->
@@ -1360,5 +1362,13 @@
             }
         }).mount('#app');
     </script>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <h2 class="footer-title">打破信息茧房</h2>
+            <p class="footer-subtitle">AI驱动的个性化日报，让您每天获取多元视角</p>
+        </div>
+    </footer>
 </body>
 </html>

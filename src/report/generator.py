@@ -2,9 +2,7 @@
 Daily report HTML generator using Deepseek AI
 """
 import logging
-import os
 from datetime import datetime
-from pathlib import Path
 from typing import List, Dict, Any
 
 from src.ai.deepseek import DeepseekClient, ArticleFilter
@@ -14,53 +12,49 @@ logger = logging.getLogger(__name__)
 
 
 class ReportGenerator:
-    """Generate daily HTML reports"""
+    """Generate daily HTML reports (stored in database only)"""
     
     def __init__(
         self,
         deepseek_client: DeepseekClient,
         template_path: str = "templates/report.html",
-        output_dir: str = "reports"
+        output_dir: str = "reports"  # Kept for backward compatibility
     ):
         """
         Initialize report generator
         
         Args:
             deepseek_client: Deepseek API client
-            template_path: Path to HTML template file
-            output_dir: Directory to save generated reports
+            template_path: Path to HTML template file (used as reference for AI)
+            output_dir: Deprecated, no longer used
         """
         self.deepseek_client = deepseek_client
         self.article_filter = ArticleFilter(deepseek_client)
         self.template_path = template_path
-        self.output_dir = Path(output_dir)
         
-        # Ensure output directory exists
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Load template
+        # Load template for AI reference
         self.template = self._load_template()
     
     def _load_template(self) -> str:
-        """Load HTML template"""
+        """Load HTML template for AI reference"""
         try:
             with open(self.template_path, 'r', encoding='utf-8') as f:
                 return f.read()
         except FileNotFoundError:
-            logger.error(f"Template not found: {self.template_path}")
-            raise
+            logger.warning(f"Template not found: {self.template_path}, using default")
+            return ""
         except Exception as e:
-            logger.error(f"Failed to load template: {e}")
-            raise
+            logger.warning(f"Failed to load template: {e}, using default")
+            return ""
     
     def generate_report(
         self,
         keyword: str,
         articles: List[Article],
         date: datetime = None
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
-        Generate daily report HTML
+        Generate daily report HTML (stored in database only, no file output)
         
         Args:
             keyword: Topic keyword
@@ -68,7 +62,11 @@ class ReportGenerator:
             date: Report date (default: today)
             
         Returns:
-            Path to generated HTML file
+            Dictionary with report info:
+            - html_content: Full HTML content
+            - summary: Report summary
+            - article_ids: List of article IDs used
+            - article_count: Number of articles
         """
         if date is None:
             date = datetime.now()
@@ -86,11 +84,18 @@ class ReportGenerator:
         
         if not filtered_articles:
             logger.warning(f"No articles after filtering for {keyword}")
-            # Generate empty report
-            return self._generate_empty_report(keyword, date_str)
+            return {
+                'html_content': None,
+                'summary': None,
+                'article_ids': [],
+                'article_count': 0
+            }
         
         # Generate summary
         summary = self.article_filter.generate_summary(keyword, filtered_articles)
+        
+        # Collect article IDs
+        article_ids = [item['article'].id for item in filtered_articles if item['article'].id]
         
         # Build prompt for HTML generation
         html_content = self._generate_html_with_ai(
@@ -104,21 +109,14 @@ class ReportGenerator:
             logger.error("Failed to generate HTML content")
             return None
         
-        # Save report with timestamp to avoid overwriting
-        timestamp = datetime.now().strftime("%H%M%S")
-        filename = f"{keyword}_{date_str}_{timestamp}.html"
-        filepath = self.output_dir / filename
+        logger.info(f"Report generated for {keyword} ({len(filtered_articles)} articles)")
         
-        try:
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            
-            logger.info(f"Report saved to {filepath}")
-            return str(filepath)
-            
-        except Exception as e:
-            logger.error(f"Failed to save report: {e}")
-            return None
+        return {
+            'html_content': html_content,
+            'summary': summary,
+            'article_ids': article_ids,
+            'article_count': len(filtered_articles)
+        }
     
     def _generate_html_with_ai(
         self,
@@ -190,7 +188,7 @@ class ReportGenerator:
             for item in articles_list
         ])
         
-        prompt = f"""请参考以下模板结构，生成一份完整的HTML日报页面。
+        prompt = f"""请严格按照提供的HTML模板，只修改文字内容，不要修改CSS样式和HTML结构。
 
 关键词：{keyword}
 日期：{date_str}
@@ -202,17 +200,18 @@ class ReportGenerator:
 报告模版：
 {self.template}
 
-要求：
-1. 使用提供的报告模版结构（1080x1440px移动端布局）
-2. 主题色为 #e60012（红色）
-3. 包含header区域（标题+关键词+日期卡片）
-4. 包含今日要点区域（today-must-read），显示摘要内容，适当用红色和黑色加粗重点词汇
-5. 包含文章列表区域（info-list），每篇文章带优先级标识
-6. 包含关键词区域（keywords），显示今日关键词，由所有文章标题提炼而来，3-4个词汇
-7. footer显示"@小牛聊AI"
-8. 保持responsive设计和优美样式
-9. 文章内容适当增加红色和黑色加粗重点突出显示
-请直接返回完整的HTML代码，使用<!DOCTYPE html>开头。"""
+**严格要求**：
+1. **完全保留模板的CSS样式代码**，一个字符都不要修改
+2. **完全保留模板的HTML结构和class名称**，不要删除或添加任何HTML元素
+3. **只修改文字内容部分**：
+   - 日期：填入 {date_str}
+   - 关键词：根据文章标题提炼3-4个关键词
+   - 今日要点：填入提供的摘要内容，适当用 <span class="text-red-bold"> 和 <span class="text-black-bold"> 标记重点
+   - 文章列表：按顺序填入文章标题、链接、内容摘要
+4. **保持模板的所有JavaScript代码不变**
+5. **保持模板的所有CSS变量和样式定义不变**
+
+请直接返回完整的HTML代码，使用<!DOCTYPE html>开头。严禁修改CSS和HTML结构！"""
         
         return prompt
     
@@ -244,17 +243,7 @@ class ReportGenerator:
         # Build articles HTML
         articles_html = ""
         for item in articles_list:
-            articles_html += f"""
-                    <div class="info-item">
-                        <div class="item-priority">{item['emoji']}</div>
-                        <div class="item-content">
-                            <h3 class="item-title">
-                                <a href="{item['url']}" target="_blank">{item['title']}</a>
-                            </h3>
-                            <p class="item-desc">{item['content'][:200]}...</p>
-                        </div>
-                    </div>
-"""
+            articles_html += f'<div class="info-item"><div class="item-priority">{item["emoji"]}</div><div class="item-content"><h3 class="item-title"><a href="{item["url"]}" target="_blank">{item["title"]}</a></h3><p class="item-desc">{item["content"][:200]}...</p></div></div>\n'
         
         # Replace template variables
         html = self.template.replace('{{date}}', date_str)

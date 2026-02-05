@@ -34,6 +34,22 @@ class ReportResponse(BaseModel):
         from_attributes = True
 
 
+class ReportDetailResponse(BaseModel):
+    """Detailed response model for report with content"""
+    id: int
+    keyword: str
+    date: str
+    file_path: str
+    article_count: int
+    generated_at: str
+    summary: Optional[str] = None
+    article_ids: Optional[List[int]] = None
+    has_content: bool = False  # Whether html_content is stored in DB
+    
+    class Config:
+        from_attributes = True
+
+
 class ReportListResponse(BaseModel):
     """Response model for report list"""
     total: int
@@ -101,21 +117,22 @@ async def list_reports(
         )
 
 
-@router.get("/{report_id}", response_model=ReportResponse)
+@router.get("/{report_id}", response_model=ReportDetailResponse)
 async def get_report(
     report_id: int,
     db: Database = Depends(get_db)
 ):
     """
-    Get report by ID
+    Get report by ID with detailed information
     
     Args:
         report_id: Report ID
     
     Returns:
-        Report details
+        Report details including summary and article IDs
     """
     try:
+        import json
         repo = ReportRepository(db)
         report = await repo.get_by_id(report_id)
         
@@ -125,13 +142,24 @@ async def get_report(
                 detail=f"Report {report_id} not found"
             )
         
-        return ReportResponse(
+        # Parse article_ids from JSON
+        article_ids = None
+        if report.article_ids:
+            try:
+                article_ids = json.loads(report.article_ids)
+            except:
+                article_ids = []
+        
+        return ReportDetailResponse(
             id=report.id,
             keyword=report.keyword,
-            date=report.date.isoformat() if report.date else "",
+            date=report.date if isinstance(report.date, str) else report.date.isoformat(),
             file_path=report.file_path,
             article_count=report.article_count,
-            generated_at=report.generated_at.isoformat() if report.generated_at else ""
+            generated_at=report.generated_at.isoformat() if report.generated_at else "",
+            summary=report.summary,
+            article_ids=article_ids,
+            has_content=report.html_content is not None
         )
     
     except HTTPException:
@@ -150,15 +178,17 @@ async def download_report(
     db: Database = Depends(get_db)
 ):
     """
-    Download report HTML file
+    Download report HTML from database
     
     Args:
         report_id: Report ID
     
     Returns:
-        HTML file
+        HTML file for download
     """
     try:
+        from fastapi.responses import Response
+        
         repo = ReportRepository(db)
         report = await repo.get_by_id(report_id)
         
@@ -168,19 +198,30 @@ async def download_report(
                 detail=f"Report {report_id} not found"
             )
         
-        # Check if file exists
-        file_path = Path(report.file_path)
-        if not file_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Report file not found"
-            )
+        # Get HTML content from database
+        if not report.html_content:
+            # Fall back to file if no content in database
+            file_path = Path(report.file_path) if report.file_path else None
+            if file_path and file_path.exists():
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Report content not found"
+                )
+        else:
+            html_content = report.html_content
         
-        # Return file
-        return FileResponse(
-            path=str(file_path),
+        # Generate filename
+        filename = f"{report.keyword}_{report.date}.html"
+        
+        return Response(
+            content=html_content,
             media_type="text/html",
-            filename=file_path.name
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
         )
     
     except HTTPException:
@@ -200,6 +241,7 @@ async def view_report(
 ):
     """
     View report HTML inline (for iframe display)
+    Prioritizes database content, falls back to file
     
     Args:
         report_id: Report ID
@@ -217,20 +259,26 @@ async def view_report(
                 detail=f"Report {report_id} not found"
             )
         
-        # Check if file exists
-        file_path = Path(report.file_path)
-        if not file_path.exists():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Report file not found"
-            )
-        
-        # Read and return HTML content
         from fastapi.responses import HTMLResponse
-        with open(file_path, 'r', encoding='utf-8') as f:
-            html_content = f.read()
         
-        return HTMLResponse(content=html_content)
+        # Get html_content from database
+        if report.html_content:
+            logger.info(f"Serving report {report_id} from database")
+            return HTMLResponse(content=report.html_content)
+        
+        # Fall back to file for legacy reports
+        if report.file_path:
+            file_path = Path(report.file_path)
+            if file_path.exists():
+                logger.info(f"Serving report {report_id} from file: {file_path}")
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+                return HTMLResponse(content=html_content)
+        
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report content not found"
+        )
     
     except HTTPException:
         raise
@@ -302,28 +350,86 @@ async def get_report_by_keyword_date(
         )
 
 
-@router.post("/generate", status_code=status.HTTP_202_ACCEPTED)
-async def generate_report(request: GenerateReportRequest):
+@router.post("/generate-only", status_code=status.HTTP_202_ACCEPTED)
+async def generate_report_only(request: GenerateReportRequest):
     """
-    Trigger manual report generation
+    Generate reports from existing articles only (no crawling).
+    
+    This endpoint uses background tasks and returns immediately.
+    Use GET /api/tasks/{task_id} to check progress.
     
     Args:
         request: Generate request (keyword optional)
     
     Returns:
-        Accepted status
+        Accepted status with task_id
     """
     try:
-        scheduler = await get_scheduler()
+        from src.utils.task_manager import get_task_manager, TaskType
+        from src.api.tasks import generate_report_only_task
         
-        # Run task once
-        await scheduler.run_once()
+        task_manager = get_task_manager()
+        keyword = request.keyword if request else None
         
-        logger.info(f"Report generation triggered for {request.keyword or 'all subscriptions'}")
+        # Submit as background task
+        task_id = await task_manager.submit(
+            TaskType.GENERATE_REPORT_ONLY,
+            generate_report_only_task,
+            keyword
+        )
+        
+        logger.info(f"Generate report only task submitted: {task_id}, keyword={keyword}")
         
         return {
             "status": "accepted",
-            "message": "Report generation started"
+            "message": "仅生成日报任务已提交（基于现有文章）",
+            "task_id": task_id,
+            "check_status_url": f"/api/tasks/{task_id}"
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to trigger report only generation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to trigger report only generation"
+        )
+
+
+@router.post("/generate", status_code=status.HTTP_202_ACCEPTED)
+async def generate_report(request: GenerateReportRequest):
+    """
+    Trigger manual report generation (background task).
+    
+    This endpoint now uses background tasks and returns immediately.
+    Use GET /api/tasks/{task_id} to check progress.
+    
+    Args:
+        request: Generate request (keyword optional)
+    
+    Returns:
+        Accepted status with task_id
+    """
+    try:
+        from src.utils.task_manager import get_task_manager, TaskType
+        from src.api.tasks import full_pipeline_task
+        
+        task_manager = get_task_manager()
+        keyword = request.keyword if request else None
+        
+        # Submit as background task
+        task_id = await task_manager.submit(
+            TaskType.FULL_PIPELINE,
+            full_pipeline_task,
+            keyword
+        )
+        
+        logger.info(f"Report generation task submitted: {task_id}, keyword={keyword}")
+        
+        return {
+            "status": "accepted",
+            "message": "日报生成任务已提交（后台执行）",
+            "task_id": task_id,
+            "check_status_url": f"/api/tasks/{task_id}"
         }
     
     except Exception as e:
@@ -337,24 +443,34 @@ async def generate_report(request: GenerateReportRequest):
 @router.post("/collect-articles", status_code=status.HTTP_202_ACCEPTED)
 async def collect_articles():
     """
-    Trigger manual article collection (crawl only, no report generation)
+    Trigger manual article collection (crawl only, no report generation).
+    
+    This endpoint now uses background tasks and returns immediately.
+    Use GET /api/tasks/{task_id} to check progress.
     
     Returns:
-        Accepted status with collected article count
+        Accepted status with task_id
     """
     try:
-        from src.scheduler.tasks import get_scheduler
+        from src.utils.task_manager import get_task_manager, TaskType
+        from src.api.tasks import crawl_articles_task
         
-        scheduler = await get_scheduler()
+        task_manager = get_task_manager()
         
-        # Run article collection only
-        await scheduler.collect_articles_only()
+        # Submit as background task
+        task_id = await task_manager.submit(
+            TaskType.CRAWL,
+            crawl_articles_task,
+            None  # All subscriptions
+        )
         
-        logger.info("Article collection triggered")
+        logger.info(f"Article collection task submitted: {task_id}")
         
         return {
             "status": "accepted",
-            "message": "Article collection started"
+            "message": "文章爬取任务已提交（后台执行）",
+            "task_id": task_id,
+            "check_status_url": f"/api/tasks/{task_id}"
         }
     
     except Exception as e:

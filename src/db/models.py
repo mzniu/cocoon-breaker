@@ -65,16 +65,26 @@ class Report:
     file_path: str
     article_count: int
     generated_at: datetime
+    html_content: Optional[str] = None  # Full HTML content of the report
+    summary: Optional[str] = None  # Report summary (今日必读)
+    article_ids: Optional[str] = None  # JSON array of article IDs used in report
     
     def __post_init__(self):
         """Ensure datetime objects"""
         if isinstance(self.generated_at, str):
             self.generated_at = datetime.fromisoformat(self.generated_at)
+    
+    def get_article_id_list(self) -> list[int]:
+        """Get article IDs as list"""
+        if not self.article_ids:
+            return []
+        import json
+        return json.loads(self.article_ids)
 
 
 @dataclass
 class ScheduleConfig:
-    """Schedule configuration model"""
+    """Schedule configuration model for report generation"""
     id: Optional[int]
     time: str  # HH:MM format
     enabled: bool
@@ -84,3 +94,20 @@ class ScheduleConfig:
         """Ensure datetime objects"""
         if isinstance(self.updated_at, str):
             self.updated_at = datetime.fromisoformat(self.updated_at)
+
+
+@dataclass
+class CrawlScheduleConfig:
+    """Crawl schedule configuration model for article collection"""
+    id: Optional[int]
+    enabled: bool
+    times: list[str]  # List of HH:MM format times, e.g. ["06:00", "12:00", "18:00", "22:00"]
+    updated_at: datetime
+    
+    def __post_init__(self):
+        """Ensure datetime objects and parse times"""
+        if isinstance(self.updated_at, str):
+            self.updated_at = datetime.fromisoformat(self.updated_at)
+        if isinstance(self.times, str):
+            import json
+            self.times = json.loads(self.times)

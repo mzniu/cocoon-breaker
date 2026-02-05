@@ -34,11 +34,17 @@ class Database:
     
     async def initialize(self):
         """Create tables if they don't exist"""
-        await self._create_articles_table()
-        await self._create_subscriptions_table()
-        await self._create_reports_table()
-        await self._create_schedule_table()
-        await self._conn.commit()
+        try:
+            await self._create_articles_table()
+            await self._create_subscriptions_table()
+            await self._create_reports_table()
+            await self._create_schedule_table()
+            await self._create_crawl_schedule_table()
+            await self._conn.commit()
+        except Exception as e:
+            logger.warning(f"Database initialization error (may be expected): {e}")
+            # 基本数据库操作，如果失败就使用现有结构
+            pass
     
     async def _create_articles_table(self):
         """Create articles table"""
@@ -56,6 +62,12 @@ class Database:
                 fetch_status TEXT DEFAULT 'pending',
                 fetched_at TEXT,
                 fetch_error TEXT,
+                actual_published_at TEXT,
+                actual_source TEXT,
+                importance_score REAL DEFAULT 50.0,
+                analysis_status TEXT DEFAULT 'pending',
+                analyzed_at TEXT,
+                cached_score REAL,
                 UNIQUE(url)
             )
         """)
@@ -93,7 +105,9 @@ class Database:
                 file_path TEXT NOT NULL,
                 article_count INTEGER NOT NULL,
                 generated_at TEXT NOT NULL,
-                UNIQUE(keyword, date)
+                html_content TEXT,
+                summary TEXT,
+                article_ids TEXT
             )
         """)
         
@@ -117,6 +131,23 @@ class Database:
         await self._conn.execute("""
             INSERT OR IGNORE INTO schedule_config (id, time, enabled, updated_at)
             VALUES (1, '08:00', 1, datetime('now'))
+        """)
+
+    async def _create_crawl_schedule_table(self):
+        """Create crawl schedule configuration table for article collection"""
+        await self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS crawl_schedule (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                enabled INTEGER DEFAULT 1,
+                times TEXT NOT NULL DEFAULT '["06:00", "12:00", "18:00", "22:00"]',
+                updated_at TEXT NOT NULL
+            )
+        """)
+        
+        # Insert default crawl schedule if not exists
+        await self._conn.execute("""
+            INSERT OR IGNORE INTO crawl_schedule (id, enabled, times, updated_at)
+            VALUES (1, 1, '["06:00", "12:00", "18:00", "22:00"]', datetime('now'))
         """)
     
     @property

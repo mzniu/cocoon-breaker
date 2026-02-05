@@ -27,6 +27,7 @@ from src.api.subscriptions import router as subscriptions_router
 from src.api.reports import router as reports_router
 from src.api.schedule import router as schedule_router
 from src.api.articles import router as articles_router
+from src.api.tasks import router as tasks_router
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -86,6 +87,12 @@ async def lifespan(app: FastAPI):
     # Initialize database
     db = Database(config.database.path)
     await db.connect()
+    
+    # Run database migrations
+    # from src.db.migrations import DatabaseMigration
+    # migration = DatabaseMigration(config.database.path)
+    # await migration.migrate(db.conn)
+    
     logger.info(f"Database connected: {config.database.path}")
     
     # Create output directories
@@ -158,6 +165,7 @@ app.include_router(subscriptions_router)
 app.include_router(reports_router)
 app.include_router(schedule_router)
 app.include_router(articles_router)
+app.include_router(tasks_router)
 
 
 # Health check endpoint

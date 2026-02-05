@@ -418,17 +418,20 @@ class ReportRepository:
         self.db = db
     
     async def create(self, report: Report) -> int:
-        """Create new report"""
+        """Create new report with full content"""
         cursor = await self.db.conn.execute("""
-            INSERT OR REPLACE INTO reports 
-            (keyword, date, file_path, article_count, generated_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO reports 
+            (keyword, date, file_path, article_count, generated_at, html_content, summary, article_ids)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             report.keyword,
             report.date,
             report.file_path,
             report.article_count,
-            report.generated_at.isoformat()
+            report.generated_at.isoformat(),
+            report.html_content,
+            report.summary,
+            report.article_ids
         ))
         
         await self.db.conn.commit()
@@ -474,7 +477,10 @@ class ReportRepository:
             date=row['date'],
             file_path=row['file_path'],
             article_count=row['article_count'],
-            generated_at=datetime.fromisoformat(row['generated_at'])
+            generated_at=datetime.fromisoformat(row['generated_at']),
+            html_content=row['html_content'] if 'html_content' in row.keys() else None,
+            summary=row['summary'] if 'summary' in row.keys() else None,
+            article_ids=row['article_ids'] if 'article_ids' in row.keys() else None
         )
 
 
@@ -520,5 +526,63 @@ class ScheduleRepository:
             INSERT OR IGNORE INTO schedule_config (id, time, enabled, updated_at)
             VALUES (1, '08:00', 1, ?)
         """, (datetime.now().isoformat(),))
+        
+        await self.db.conn.commit()
+
+
+class CrawlScheduleRepository:
+    """Repository for Crawl Schedule configuration operations"""
+    
+    def __init__(self, db: Database):
+        self.db = db
+    
+    async def get_config(self):
+        """Get crawl schedule configuration"""
+        from src.db.models import CrawlScheduleConfig
+        import json
+        
+        cursor = await self.db.conn.execute("""
+            SELECT * FROM crawl_schedule WHERE id = 1
+        """)
+        
+        row = await cursor.fetchone()
+        if not row:
+            # Create default if not exists
+            await self._create_default()
+            return await self.get_config()
+        
+        times = row['times']
+        if isinstance(times, str):
+            times = json.loads(times)
+        
+        return CrawlScheduleConfig(
+            id=row['id'],
+            enabled=bool(row['enabled']),
+            times=times,
+            updated_at=datetime.fromisoformat(row['updated_at'])
+        )
+    
+    async def update_config(self, enabled: bool, times: list[str]) -> bool:
+        """Update crawl schedule configuration"""
+        import json
+        
+        cursor = await self.db.conn.execute("""
+            UPDATE crawl_schedule 
+            SET enabled = ?, times = ?, updated_at = ?
+            WHERE id = 1
+        """, (1 if enabled else 0, json.dumps(times), datetime.now().isoformat()))
+        
+        await self.db.conn.commit()
+        return cursor.rowcount > 0
+    
+    async def _create_default(self):
+        """Create default crawl schedule configuration"""
+        import json
+        
+        default_times = ["06:00", "12:00", "18:00", "22:00"]
+        await self.db.conn.execute("""
+            INSERT OR IGNORE INTO crawl_schedule (id, enabled, times, updated_at)
+            VALUES (1, 1, ?, ?)
+        """, (json.dumps(default_times), datetime.now().isoformat()))
         
         await self.db.conn.commit()

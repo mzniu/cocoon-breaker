@@ -40,73 +40,77 @@ AI 日报生成工具，解决"信息茧房"问题。自动爬取用户订阅主
 ```
 cocoon-breaker/
 ├── src/
-│   ├── main.py              # FastAPI 应用入口
+│   ├── main.py              # FastAPI 应用入口（lifespan manager）
 │   ├── config.py            # 配置加载（YAML + 环境变量）
-│   ├── api/                  # REST API 路由
-│   │   ├── __init__.py
-│   │   ├── subscriptions.py  # 订阅管理 API
-│   │   ├── reports.py        # 日报 API
-│   │   └── schedule.py       # 定时设置 API
-│   ├── crawler/              # 爬虫模块
-│   │   ├── __init__.py
-│   │   ├── base.py           # 爬虫基类
-│   │   ├── baidu.py          # 百度新闻爬取
-│   │   └── bing.py           # 必应搜索爬取
+│   ├── api/                  # REST API 路由（11 endpoints total）
+│   │   ├── subscriptions.py  # 订阅管理 API (5 endpoints)
+│   │   ├── reports.py        # 日报 API (5 endpoints)
+│   │   ├── schedule.py       # 定时设置 API (2 endpoints)
+│   │   └── articles.py       # 文章 API（新增）
+│   ├── crawler/              # 爬虫模块（继承 BaseCrawler）
+│   │   ├── base.py           # 抽象基类（含 User-Agent 轮换）
+│   │   ├── baidu.py          # 百度新闻搜索
+│   │   ├── yahoo.py          # Yahoo 搜索（国内可访问）
+│   │   ├── bing.py           # 必应搜索（备选）
+│   │   ├── google.py         # Google Custom Search API（可选）
+│   │   ├── tavily.py         # Tavily AI 搜索（可选）
+│   │   ├── kr36.py           # 36氪 RSS 爬取
+│   │   ├── huxiu.py          # 虎嗅网 RSS 爬取
+│   │   ├── toutiao.py        # 今日头条（实验性）
+│   │   ├── content_fetcher.py # 文章正文提取（Playwright）
+│   │   └── search_utils.py   # 搜索工具函数
 │   ├── db/                   # 数据库模块
-│   │   ├── __init__.py
-│   │   ├── database.py       # SQLite 连接管理
+│   │   ├── database.py       # SQLite 异步连接（aiosqlite）
 │   │   ├── models.py         # 数据模型（dataclass）
-│   │   └── repository.py     # CRUD 操作
+│   │   ├── repository.py     # CRUD + 评分系统
+│   │   └── migrations.py     # Schema 版本管理（新增）
 │   ├── ai/                   # AI 集成
-│   │   ├── __init__.py
-│   │   └── deepseek.py       # Deepseek API 调用
+│   │   ├── deepseek.py       # Deepseek API 客户端（重试逻辑）
+│   │   └── article_analyzer.py # 文章分析器（时效性）
 │   ├── report/               # 日报生成
-│   │   ├── __init__.py
-│   │   └── generator.py      # HTML 日报生成器
+│   │   └── generator.py      # HTML 日报生成器（LLM 驱动）
 │   ├── scheduler/            # 定时任务
-│   │   ├── __init__.py
-│   │   └── tasks.py          # schedule 任务定义
+│   │   └── tasks.py          # schedule 任务（多源爬取 + 评分）
+│   ├── utils/                # 工具模块
+│   │   └── log_buffer.py     # 实时日志缓冲（用于前端展示）
 │   └── static/               # 前端静态文件
-│       ├── index.html        # Vue 3 单页应用
-│       ├── css/
-│       │   └── style.css
+│       ├── index.html        # Vue 3 单页应用（主页）
+│       ├── articles.html     # 文章管理页面（新增）
+│       ├── css/style.css     # 统一设计系统
 │       └── js/
-│           └── app.js        # Vue 应用逻辑
+│           ├── app.js        # Vue 应用逻辑
+│           └── vue.global.prod.js # Vue 3 CDN 文件
 ├── templates/
-│   └── report.html           # 日报 HTML 模板（LLM 参考）
+│   └── report.html           # 日报 HTML 模板（供 LLM 参考）
 ├── tests/
-│   └── ut/                   # 单元测试目录
-│       ├── __init__.py
-│       ├── test_config.py
-│       ├── test_crawler/
-│       │   ├── test_baidu.py
-│       │   └── test_bing.py
-│       ├── test_db/
-│       │   └── test_repository.py
-│       ├── test_ai/
-│       │   └── test_deepseek.py
-│       ├── test_report/
-│       │   └── test_generator.py
-│       └── test_api/
-│           ├── test_subscriptions.py
-│           ├── test_reports.py
-│           └── test_schedule.py
+│   ├── ut/                   # 单元测试（60+ tests）
+│   │   ├── test_crawler/
+│   │   ├── test_db/
+│   │   ├── test_ai/
+│   │   ├── test_report/
+│   │   └── test_api/
+│   └── integration/          # 集成测试
+│       └── test_workflow.py
+├── docs/                     # 技术文档
+│   ├── PRD.md               # 产品需求文档
+│   ├── NEWS_FRESHNESS_FEATURE.md # 时效性功能说明
+│   └── 36KR_THEPAPER_INTEGRATION.md # RSS 集成指南
 ├── config.yaml               # 用户配置文件
-├── config.example.yaml       # 配置模板
+├── config.example.yaml       # 配置模板（125 lines）
 ├── reports/                  # 生成的日报输出目录（HTML文件）
 ├── data/                     # SQLite 数据库文件
-├── logs/                     # 日志文件
+├── logs/                     # 日志文件（带轮转）
 └── requirements.txt          # Python 依赖
 ```
 
 **模块职责**：
-- `api/`：REST API 路由，处理 HTTP 请求
-- `crawler/`：网页爬取，返回标准化的文章列表
-- `db/`：数据持久化，文章去重
-- `ai/`：调用 Deepseek 筛选和摘要
-- `report/`：Markdown 格式日报生成
-- `scheduler/`：定时任务管理
-- `static/`：Vue 3 前端页面
+- `api/`：REST API 路由，使用 `APIRouter`，在 `main.py` 中注册
+- `crawler/`：网页爬取，继承 `BaseCrawler`，返回 `List[Article]`，失败返回空列表不抛异常
+- `db/`：异步 SQLite 操作，使用 `INSERT OR IGNORE` 去重，`get_by_keyword_with_scoring()` 实现混合评分
+- `ai/`：Deepseek API 调用（超时 30s，重试 3 次），`ArticleAnalyzer` 分析时效性和重要性
+- `report/`：通过 LLM 直接生成完整 HTML，参考 `templates/report.html` 模板
+- `scheduler/`：`schedule` 库实现定时任务，使用 asyncio 异步爬取，`_running` 标志防止重复执行
+- `static/`：Vue 3 通过 CDN 引入，无需 npm 构建，使用 Options API 风格
 
 ## Development Workflow
 
@@ -150,11 +154,14 @@ pytest tests/ut/ -v --cov=src          # 带覆盖率报告
 - **API 路由**：`/api/resource` (RESTful 风格)
 
 ### Patterns
-- **配置**：YAML 文件 + 环境变量覆盖，敏感信息（API Key）仅用环境变量
-- **日志**：使用 `logging` 模块，格式 `[时间] [级别] [模块] 消息`
-- **错误处理**：爬虫/API 失败不中断流程，记录日志后继续
-- **数据模型**：使用 dataclass 定义，与 SQLite 表对应
-- **API 响应**：统一使用 Pydantic 模型，返回 JSON
+- **配置**：YAML 文件（`config.yaml`）+ 环境变量覆盖（`${VAR_NAME}`格式），敏感信息（API Key）仅用环境变量
+- **日志**：使用 `logging` 模块，RotatingFileHandler（10MB/file，5个备份），实时日志缓冲见 `log_buffer.py`
+- **错误处理**：爬虫/API 失败不中断流程，记录日志后继续，Deepseek API 超时重试 3 次（指数退避）
+- **数据模型**：使用 `@dataclass` 定义（`db/models.py`），与 SQLite 表对应
+- **API 响应**：统一使用 Pydantic `BaseModel`，返回 JSON，所有路由使用 `APIRouter(prefix="/api/...")`
+- **异步模式**：Database 使用 `aiosqlite` 异步连接，FastAPI 路由用 `async def`，爬虫用 `asyncio.gather()` 并发
+- **数据库迁移**：`migrations.py` 管理 schema 版本，使用 `schema_version` 表跟踪，避免数据丢失
+- **评分系统**：`ArticleRepository.get_by_keyword_with_scoring()` 实现混合评分（质量 0.7 + 时效性 0.3），时间衰减用指数函数
 
 ### 示例：数据模型
 ```python
@@ -191,48 +198,125 @@ class ArticleResponse(BaseModel):
 
 ## External Dependencies
 
-### Deepseek API
+### Deepseek API（必需）
 - 文档：https://platform.deepseek.com/
-- 模型：`deepseek-reasoner`
-- 认证：Bearer Token（环境变量 `DEEPSEEK_API_KEY`）
-- 错误处理：超时重试 3 次，失败后跳过本次生成
+- 模型：`deepseek-reasoner`（reasoning + generation）
+- 认证：Bearer Token（环境变量 `DEEPSEEK_API_KEY`，启动时必须存在）
+- 错误处理：超时 30s，重试 3 次（指数退避），失败后跳过本次生成
+- 用途：文章筛选（`ArticleFilter`）+ 完整 HTML 生成（`ReportGenerator`）
 
-### 爬虫注意事项
-- 请求间隔：随机 1-3 秒
-- User-Agent：轮换常见浏览器 UA
-- 反爬失败：记录日志，返回空列表不抛异常
+### 爬虫数据源
+**免费爬虫**（默认启用）：
+- Baidu（百度新闻）：BeautifulSoup 解析，User-Agent 轮换，随机 1-3s 间隔
+- Yahoo（雅虎搜索）：国内可访问，无需代理
+- Kr36（36氪 RSS）：feedparser 解析，tech/business 内容
+- Huxiu（虎嗅网 RSS）：深度商业报道
+
+**API 源**（可选，需配置）：
+- Google Custom Search：环境变量 `GOOGLE_API_KEY` + `GOOGLE_SEARCH_ENGINE_ID`，免费 100 次/天
+- Tavily API：环境变量 `TAVILY_API_KEY`，AI 优化搜索，支持 `basic`/`advanced` 模式
+
+**爬虫规范**：
+- 继承 `BaseCrawler`，实现 `crawl(keyword: str, max_results: int) -> List[Article]`
+- 失败返回 `[]` 不抛异常，记录日志 `logger.error()`
+- URL 去重通过 `INSERT OR IGNORE` 自动处理
+- `content_fetcher.py` 使用 Playwright 提取完整正文（可选）
 
 ## Common Tasks
 
 ### 添加新的信息源
-1. 在 `src/crawler/` 下创建新模块（如 `zhihu.py`）
-2. 继承 `BaseCrawler` 基类，实现 `crawl(keyword: str) -> List[Article]`
-3. 在 `config.yaml` 的 `crawler.sources` 中添加
-4. 在 `tests/ut/test_crawler/` 下编写单元测试
+1. 在 `src/crawler/` 下创建新模块（如 `weibo.py`）
+2. 继承 `BaseCrawler`，实现 `crawl(keyword: str, max_results: int) -> List[Article]`
+   ```python
+   class WeiboCrawler(BaseCrawler):
+       def crawl(self, keyword: str, max_results: int = 20) -> List[Article]:
+           try:
+               # 爬取逻辑
+               return articles
+           except Exception as e:
+               logger.error(f"Weibo crawl failed: {e}")
+               return []  # 失败返回空列表
+   ```
+3. 在 `config.yaml` 的 `crawler.sources` 中添加 `weibo`
+4. 在 `src/scheduler/tasks.py` 的 `initialize()` 中实例化爬虫
+5. 在 `tests/ut/test_crawler/test_weibo.py` 编写单元测试
 
 ### 添加新的 API 端点
 1. 在 `src/api/` 下创建或修改路由模块
-2. 使用 Pydantic 定义请求/响应模型
-3. 在 `src/main.py` 中注册路由
-4. 在 `tests/ut/test_api/` 下编写测试
+2. 使用 Pydantic 定义请求/响应模型（继承 `BaseModel`）
+3. 使用 `APIRouter(prefix="/api/resource", tags=["resource"])` 创建路由
+4. 在 `src/main.py` 的 `app.include_router()` 中注册
+5. 在 `tests/ut/test_api/` 下编写测试（使用 `TestClient`）
 
 ### 修改日报格式
-1. 编辑 `templates/report.html` 中的 HTML/CSS 模板
-2. 修改 `src/report/generator.py` 中的 LLM Prompt
-3. 日报格式为 HTML，支持浏览器直接查看
-4. 更新对应的单元测试
+1. 编辑 `templates/report.html` 中的 HTML/CSS 模板（LLM 参考）
+2. 修改 `src/report/generator.py` 的 `_generate_html_with_ai()` 中的 Prompt
+3. 日报为 1080x1440px 移动端友好设计，主题色 #e60012
+4. 更新 `tests/ut/test_report/test_generator.py` 测试用例
+
+### 添加数据库字段
+1. 修改 `src/db/models.py` 中的 `@dataclass` 定义
+2. 在 `src/db/migrations.py` 添加新迁移函数 `_migration_00X_description()`
+3. 在 `migrations` 列表中注册新版本号
+4. 运行服务，迁移自动应用（见日志 "Applying migration X..."）
+5. 更新 `repository.py` 中的 SQL 语句
+
+### 调整时效性/质量权重
+编辑 `config.yaml`：
+```yaml
+report:
+  time_range_hours: 24        # 仅选择最近 24 小时的新闻
+  quality_weight: 0.7         # 质量权重（0-1）
+  freshness_weight: 0.3       # 时效性权重（0-1）
+  time_decay_lambda: 0.1      # 时间衰减系数（越大衰减越快）
+```
 
 ## Notes for AI Agents
 
+**配置与环境**：
 - **不要修改** `config.yaml` 中的 API Key 占位符，保持 `${DEEPSEEK_API_KEY}` 格式
-- **爬虫模块**返回空列表而非抛异常，保证流程健壮性
-- **SQLite** 使用 `url` 字段唯一约束去重，插入时用 `INSERT OR IGNORE`
-- 日报文件名格式：`{keyword}_{YYYY-MM-DD}.html`
-- **FastAPI** 路由使用 `APIRouter`，在 `main.py` 中统一注册
-- **前端** Vue 3 通过 CDN 引入，无需 npm 构建
-- 优先使用标准库，第三方依赖限于：`fastapi`, `uvicorn`, `requests`, `beautifulsoup4`, `schedule`, `pyyaml`
-- **每个模块必须有对应的单元测试**，测试文件放在 `tests/ut/` 对应子目录
-- **日报生成**：通过 Deepseek 直接生成完整 HTML，参考 `templates/report.html` 模板
+- 启动时 `DEEPSEEK_API_KEY` 必须存在，否则服务启动失败（500 错误）
+- Google/Tavily API 可选，未配置时相应爬虫自动跳过
+
+**数据库操作**：
+- **SQLite** 使用 `url` 字段唯一约束（`UNIQUE`），插入时用 `INSERT OR IGNORE` 自动去重
+- `aiosqlite` 异步操作，所有 DB 方法必须 `await`，例如：`await repo.create(article)`
+- 新增字段需编写迁移（`migrations.py`），不要直接修改表结构
+- `ArticleRepository.create()` 插入成功返回 ID，重复返回 `None`
+
+**爬虫规范**：
+- **爬虫模块**返回 `List[Article]` 或 `[]`，不抛异常（`logger.error()` 记录）
+- `BaseCrawler` 提供 `_make_request()` 方法（含重试、User-Agent 轮换）
+- `_random_delay()` 添加 1-3s 随机延迟，避免被封
+- RSS 爬虫（kr36, huxiu）使用 `feedparser`，不需要 `_random_delay()`
+
+**API 开发**：
+- **FastAPI** 路由使用 `router = APIRouter(prefix="/api/...", tags=[...])`
+- 在 `main.py` 的 `app.include_router(router)` 统一注册
+- Pydantic 模型使用 `Field(..., min_length=1, description="...")`
+- 依赖注入：`db: Database = Depends(get_db)`
+
+**前端规范**：
+- **Vue 3** CDN 引入（`vue.global.prod.js`），无需 npm/构建步骤
+- Options API 风格：`data()`, `computed`, `methods`, `mounted`
+- 统一设计：紫色渐变主题 `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`，卡片圆角 `12px`
+- 长列表必须分页（20 条/页），搜索加防抖（500ms）
+
+**日报生成**：
+- 日报文件名格式：`{keyword}_{YYYY-MM-DD}_{HHMMSS}.html`（带时间戳避免覆盖）
+- 通过 Deepseek 直接生成完整 HTML（`_generate_html_with_ai()`），参考 `templates/report.html`
+- 筛选使用 `ArticleFilter.filter_and_rank()`，返回 7 篇文章
+- 评分公式：`final_score = 0.7 × quality + 0.3 × exp(-0.1 × hours)`
+
+**测试要求**：
+- **每个模块必须有对应的单元测试**，放在 `tests/ut/` 对应子目录
+- 使用 `pytest tests/ut/` 运行，覆盖率 `--cov=src`
+- API 测试使用 `TestClient`，异步测试用 `pytest-asyncio` 的 `@pytest.mark.asyncio`
+
+**依赖管理**：
+- 优先使用标准库（`asyncio`, `logging`, `datetime`）
+- 第三方库：`fastapi`, `uvicorn`, `aiosqlite`, `requests`, `beautifulsoup4`, `schedule`, `pyyaml`, `feedparser`, `playwright`
+- 添加新依赖前必须询问用户（见"方案确认原则"）
 
 ## Development Standards & Quality Control
 

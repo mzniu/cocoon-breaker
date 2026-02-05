@@ -52,6 +52,8 @@ class DatabaseMigration:
             (2, self._migration_002_add_score_cache),
             (3, self._migration_003_add_full_content_fields),
             (4, self._migration_004_add_analysis_fields),
+            (5, self._migration_005_add_crawl_schedule),
+            (6, self._migration_006_add_report_content),
         ]
         
         # Apply pending migrations
@@ -71,11 +73,16 @@ class DatabaseMigration:
     
     async def _migration_002_add_score_cache(self, conn: aiosqlite.Connection):
         """Add cached score column to articles table (optional)"""
-        # 仅作示例，实际可能不需要
-        await conn.execute("""
-            ALTER TABLE articles 
-            ADD COLUMN cached_score REAL DEFAULT NULL
-        """)
+        # Check if column exists first
+        cursor = await conn.execute("PRAGMA table_info(articles)")
+        columns = await cursor.fetchall()
+        column_names = [column[1] for column in columns]
+        
+        if 'cached_score' not in column_names:
+            await conn.execute("""
+                ALTER TABLE articles 
+                ADD COLUMN cached_score REAL DEFAULT NULL
+            """)
         
         # Create index for score-based queries
         await conn.execute("""
@@ -190,6 +197,56 @@ class DatabaseMigration:
         """)
         
         logger.info("Added AI analysis related fields to articles table")
+
+    async def _migration_005_add_crawl_schedule(self, conn: aiosqlite.Connection):
+        """Add crawl_schedule table for scheduled article collection"""
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS crawl_schedule (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                times TEXT NOT NULL DEFAULT '["06:00", "12:00", "18:00", "22:00"]',
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        
+        # Insert default config if not exists
+        await conn.execute("""
+            INSERT OR IGNORE INTO crawl_schedule (id, enabled, times, updated_at)
+            VALUES (1, 1, '["06:00", "12:00", "18:00", "22:00"]', datetime('now'))
+        """)
+        
+        logger.info("Added crawl_schedule table for scheduled article collection")
+
+    async def _migration_006_add_report_content(self, conn: aiosqlite.Connection):
+        """Add html_content, summary, article_ids fields to reports table"""
+        # Add html_content field
+        try:
+            await conn.execute("""
+                ALTER TABLE reports 
+                ADD COLUMN html_content TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column html_content may already exist: {e}")
+        
+        # Add summary field
+        try:
+            await conn.execute("""
+                ALTER TABLE reports 
+                ADD COLUMN summary TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column summary may already exist: {e}")
+        
+        # Add article_ids field (JSON array of article IDs)
+        try:
+            await conn.execute("""
+                ALTER TABLE reports 
+                ADD COLUMN article_ids TEXT
+            """)
+        except Exception as e:
+            logger.warning(f"Column article_ids may already exist: {e}")
+        
+        logger.info("Added html_content, summary, article_ids fields to reports table")
 
 
 async def run_migrations(db_path: str):
